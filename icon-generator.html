@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NutriSnap Icon Generator</title>
+</head>
+<body style="margin: 0; padding: 20px; background: #1a1a1a; font-family: sans-serif;">
+    <h1 style="color: white;">NutriSnap Icon Generator</h1>
+    <p style="color: #aaa;">Right-click the icon below and "Save Image As..." with the appropriate filename:</p>
+    <ul style="color: #aaa;">
+        <li>icon-72.png (72x72)</li>
+        <li>icon-96.png (96x96)</li>
+        <li>icon-128.png (128x128)</li>
+        <li>icon-144.png (144x144)</li>
+        <li>icon-152.png (152x152)</li>
+        <li>icon-192.png (192x192)</li>
+        <li>icon-384.png (384x384)</li>
+        <li>icon-512.png (512x512)</li>
+    </ul>
+    
+    <div id="icons"></div>
+    
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const container = document.getElementById('icons');
+        
+        sizes.forEach(size => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#00ffa3');
+            gradient.addColorStop(1, '#4ecdc4');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Add rounded corners
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, size * 0.2);
+            ctx.fill();
+            
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Draw Apple emoji (🍎)
+            ctx.font = `${size * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🍎', size / 2, size / 2);
+            
+            // Create download link
+            const div = document.createElement('div');
+            div.style.cssText = 'display: inline-block; margin: 10px; text-align: center;';
+            
+            const img = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = img;
+            link.download = `icon-${size}.png`;
+            link.innerHTML = `<img src="${img}" width="${Math.min(size, 128)}" style="border: 2px solid #333; border-radius: 20%; display: block;"><br><span style="color: white; font-size: 12px;">icon-${size}.png</span>`;
+            
+            div.appendChild(link);
+            container.appendChild(div);
+        });
+    </script>
+</body>
+</html>

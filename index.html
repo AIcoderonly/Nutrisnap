@@ -1,0 +1,3315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Track your nutrition with AI-powered food recognition, personalized goals, and comprehensive food database">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NutriSnap">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>NutriSnap - AI Calorie Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #141824;
+            --bg-tertiary: #1e2433;
+            --accent-green: #00ffa3;
+            --accent-orange: #ff6b35;
+            --accent-blue: #4ecdc4;
+            --text-primary: #ffffff;
+            --text-secondary: #a8b2d1;
+            --text-muted: #6b7794;
+            --border: rgba(255, 255, 255, 0.1);
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+        
+        body {
+            font-family: 'Manrope', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(0, 255, 163, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 107, 53, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(78, 205, 196, 0.02) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        
+        header {
+            padding: 32px 24px 24px;
+            background: linear-gradient(180deg, var(--bg-primary) 0%, transparent 100%);
+        }
+        
+        h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 2.5rem;
+            font-weight: 400;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 400;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 12px;
+            padding: 0 24px 24px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px 16px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+        
+        .stat-card.primary {
+            grid-column: span 1;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+        
+        .stat-value.large {
+            font-size: 2.5rem;
+        }
+        
+        .stat-unit {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-left: 4px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+            border-radius: 3px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .action-tabs {
+            padding: 0 24px;
+            margin-bottom: 24px;
+        }
+        
+        .tabs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .tab-btn {
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Manrope', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 100px;
+        }
+        
+        .tab-icon {
+            font-size: 2rem;
+            line-height: 1;
+        }
+        
+        .tab-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+        
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--accent-green) 0%, var(--accent-blue) 100%);
+            color: var(--bg-primary);
+            border-color: transparent;
+            transform: scale(1.02);
+        }
+        
+        .tab-btn:hover:not(.active) {
+            background: var(--bg-tertiary);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .input-section {
+            padding: 0 24px;
+            margin-bottom: 24px;
+        }
+        
+        .input-panel {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .input-panel.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 18px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Manrope', sans-serif;
+            transition: all 0.3s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-green);
+            background: var(--bg-tertiary);
+        }
+        
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .camera-zone {
+            background: var(--bg-secondary);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .camera-zone:hover {
+            border-color: var(--accent-green);
+            background: var(--bg-tertiary);
+        }
+        
+        .camera-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        
+        .camera-text {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        
+        .camera-subtext {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .analyzing {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 16px;
+            display: none;
+            text-align: center;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 12px;
+            border: 3px solid var(--bg-primary);
+            border-top-color: var(--accent-green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .food-list {
+            padding: 0 24px;
+        }
+        
+        .food-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            animation: slideIn 0.4s ease;
+        }
+        
+        @keyframes slideIn {
+            from { 
+                opacity: 0; 
+                transform: translateX(-20px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateX(0);
+            }
+        }
+        
+        .food-item:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateX(4px);
+        }
+        
+        .food-info h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .food-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .food-calories {
+            text-align: right;
+        }
+        
+        .cal-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+        
+        .cal-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--accent-orange);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 8px;
+            margin-left: 12px;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+        }
+        
+        .delete-btn:hover {
+            opacity: 1;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+        
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        
+        .suggestions {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            margin-top: -4px;
+        }
+        
+        .suggestion-item {
+            padding: 14px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s ease;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .suggestion-item:hover {
+            background: var(--bg-secondary);
+        }
+        
+        .suggestion-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .suggestion-cal {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .add-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            border: none;
+            border-radius: 12px;
+            color: var(--bg-primary);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: all 0.3s ease;
+            font-family: 'Manrope', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 255, 163, 0.3);
+        }
+        
+        .add-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .history-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .history-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .history-date {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        
+        .history-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        
+        .history-stat {
+            text-align: center;
+        }
+        
+        .history-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-green);
+            margin-bottom: 4px;
+        }
+        
+        .history-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .history-meals {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        #historyContent {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .data-btn {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Manrope', sans-serif;
+        }
+        
+        .data-btn:hover {
+            background: var(--bg-secondary);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .data-btn.danger:hover {
+            background: var(--accent-orange);
+            color: var(--bg-primary);
+            border-color: var(--accent-orange);
+        }
+        
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px 16px;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        
+        .chart-container canvas {
+            max-height: 250px;
+        }
+        
+        .profile-form {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Manrope', sans-serif;
+            transition: all 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-green);
+            background: var(--bg-primary);
+        }
+        
+        .form-group select {
+            cursor: pointer;
+        }
+        
+        .results-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-label {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .result-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NutriSnap</h1>
+            <p class="subtitle">Track your nutrition with AI precision</p>
+        </header>
+        
+        <div class="stats-grid">
+            <div class="stat-card primary">
+                <div class="stat-label">Today's Intake</div>
+                <div class="stat-value large" id="totalCalories">0</div>
+                <span class="stat-unit">kcal</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="calorieProgress" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Protein</div>
+                <div class="stat-value" id="totalProtein">0</div>
+                <span class="stat-unit">g</span>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Carbs</div>
+                <div class="stat-value" id="totalCarbs">0</div>
+                <span class="stat-unit">g</span>
+            </div>
+        </div>
+        
+        <!-- Fasting Window Status -->
+        <div id="fastingStatus" style="background: var(--bg-secondary); padding: 14px 20px; border-radius: 12px; margin: 0 24px 20px 24px; text-align: center; display: none; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px;">FASTING WINDOW</div>
+            <div id="fastingTimeLeft" style="font-size: 1.15rem; font-weight: 700;"></div>
+        </div>
+        
+        <div class="action-tabs">
+            <div class="tabs-grid">
+                <button class="tab-btn grid-btn active" data-tab="search">
+                    <span class="tab-icon">🔍</span>
+                    <span class="tab-label">Search</span>
+                </button>
+                <button class="tab-btn grid-btn" data-tab="manual">
+                    <span class="tab-icon">✏️</span>
+                    <span class="tab-label">Manual</span>
+                </button>
+                <button class="tab-btn grid-btn" data-tab="history">
+                    <span class="tab-icon">📊</span>
+                    <span class="tab-label">History</span>
+                </button>
+                <button class="tab-btn grid-btn" data-tab="profile">
+                    <span class="tab-icon">⚙️</span>
+                    <span class="tab-label">Profile</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="input-section">
+            <div class="input-panel active" id="searchPanel">
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="foodSearch"
+                        placeholder="Search for food... (e.g., apple, chicken breast)"
+                    >
+                    <div class="suggestions" id="suggestions"></div>
+                </div>
+            </div>
+            
+            <div class="input-panel" id="manualPanel">
+                <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 16px; padding: 20px;">
+                    <h3 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 16px; font-weight: 600;">Add Food Manually</h3>
+                    
+                    <div class="form-group">
+                        <label>Food Name *</label>
+                        <input type="text" id="manualFoodName" placeholder="e.g., Homemade Smoothie">
+                    </div>
+                    
+                    <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--accent-green); font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;">📊 Nutritional Values (per 100g)</h4>
+                        
+                        <div class="form-group">
+                            <label>Calories per 100g *</label>
+                            <input type="number" id="manualCaloriesPer100" placeholder="e.g., 150" min="0" step="1">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Protein per 100g (g) *</label>
+                            <input type="number" id="manualProteinPer100" placeholder="e.g., 12" min="0" step="0.1">
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Carbs per 100g (g) *</label>
+                            <input type="number" id="manualCarbsPer100" placeholder="e.g., 25" min="0" step="0.1">
+                        </div>
+                    </div>
+                    
+                    <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border);">
+                        <h4 style="color: var(--accent-blue); font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;">🍽️ Your Serving Size</h4>
+                        
+                        <div class="form-group">
+                            <label>Serving Size (grams) *</label>
+                            <input type="number" id="manualServingGrams" placeholder="e.g., 250" min="1" step="0.1">
+                            <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 4px;">Enter the weight in grams of what you ate</small>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Date *</label>
+                                <input type="date" id="manualDate" style="width: 100%; padding: 14px 16px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 1rem; font-family: 'Manrope', sans-serif;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>Time *</label>
+                                <input type="time" id="manualTime" style="width: 100%; padding: 14px 16px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 1rem; font-family: 'Manrope', sans-serif;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="calculatedPreview" style="background: linear-gradient(135deg, rgba(0, 255, 163, 0.1), rgba(78, 205, 196, 0.1)); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--accent-green); display: none;">
+                        <h4 style="color: var(--accent-green); font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;">✨ Calculated Values</h4>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);" id="previewCalories">0</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">kcal</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-blue);" id="previewProtein">0</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">protein (g)</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-orange);" id="previewCarbs">0</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">carbs (g)</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="add-btn" id="addManualBtn">Add to Log</button>
+                    
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; text-align: center;">
+                        * Required fields
+                    </p>
+                </div>
+            </div>
+            
+            
+            <div class="input-panel" id="historyPanel">
+                <div class="chart-container">
+                    <canvas id="nutritionChart"></canvas>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 16px; margin-top: 24px; flex-wrap: wrap;">
+                    <button class="data-btn" id="exportBtn">📥 Export JSON</button>
+                    <button class="data-btn" id="exportExcelBtn" style="background: linear-gradient(135deg, #1d6f42, #38b76a); color: white; border: none;">📊 Export Excel</button>
+                    <button class="data-btn" id="importBtn">📤 Import</button>
+                    <button class="data-btn danger" id="clearBtn">🗑️ Clear</button>
+                </div>
+                <input type="file" id="importFile" accept=".json" style="display: none;">
+                <div id="historyContent">
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div>No history available yet</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-panel" id="profilePanel">
+                <div class="profile-form">
+                    <h3 style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 20px; font-weight: 600;">Your Profile</h3>
+                    
+                    <div class="form-group">
+                        <label>Age</label>
+                        <input type="number" id="age" placeholder="25" min="1" max="120">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Sex</label>
+                        <select id="sex">
+                            <option value="">Select...</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Height (cm)</label>
+                        <input type="number" id="height" placeholder="175" min="1" max="300">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Weight (kg)</label>
+                        <input type="number" id="weight" placeholder="70" min="1" max="500">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Body Fat % (optional)</label>
+                        <input type="number" id="bodyFat" placeholder="15" min="1" max="60" step="0.1">
+                        <small style="color: var(--text-muted); font-size: 0.8rem; display: block; margin-top: 4px;">If unknown, we'll estimate based on other metrics</small>
+                    </div>
+                    
+                    <div class="form-group" style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                        <label style="color: var(--accent-green); margin-bottom: 8px;">📊 Track Weight Progress</label>
+                        <small style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-bottom: 12px;">Update your weight regularly to see trends over time</small>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; margin-bottom: 4px;">Current Weight (kg)</label>
+                                <input type="number" id="currentWeight" placeholder="70" min="1" max="500" step="0.1">
+                            </div>
+                            <button class="data-btn" id="logWeightBtn" style="height: 48px; flex-shrink: 0;">Log Weight</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Activity Level</label>
+                        <select id="activityLevel">
+                            <option value="1.2">Sedentary (little or no exercise)</option>
+                            <option value="1.375">Lightly active (1-3 days/week)</option>
+                            <option value="1.55" selected>Moderately active (3-5 days/week)</option>
+                            <option value="1.725">Very active (6-7 days/week)</option>
+                            <option value="1.9">Extremely active (2x per day)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Goal</label>
+                        <select id="goal">
+                            <option value="cut">Lose Weight (Cut)</option>
+                            <option value="maintain" selected>Maintain Weight</option>
+                            <option value="bulk">Build Muscle (Bulk)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                        <label style="color: var(--accent-orange); margin-bottom: 8px; display: block;">🕐 Intermittent Fasting Window (Optional)</label>
+                        <small style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-bottom: 12px;">Set your daily eating window for IF tracking</small>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div>
+                                <label style="font-size: 0.85rem; margin-bottom: 4px; display: block;">Start Time</label>
+                                <input type="time" id="fastingStart" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.85rem; margin-bottom: 4px; display: block;">End Time</label>
+                                <input type="time" id="fastingEnd" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="add-btn" id="calculateBtn">Calculate My Goals</button>
+                    
+                    <div id="resultsSection" style="display: none; margin-top: 24px;">
+                        <div class="results-card">
+                            <h4 style="color: var(--accent-green); font-size: 1rem; margin-bottom: 16px; font-weight: 600;">Your Personalized Goals</h4>
+                            
+                            <div class="result-item">
+                                <span class="result-label">Daily Calories</span>
+                                <span class="result-value" id="targetCalories">0</span>
+                            </div>
+                            
+                            <div class="result-item">
+                                <span class="result-label">Protein</span>
+                                <span class="result-value" id="targetProtein">0g</span>
+                            </div>
+                            
+                            <div class="result-item">
+                                <span class="result-label">Carbs</span>
+                                <span class="result-value" id="targetCarbs">0g</span>
+                            </div>
+                            
+                            <div class="result-item">
+                                <span class="result-label">Fats</span>
+                                <span class="result-value" id="targetFats">0g</span>
+                            </div>
+                            
+                            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;" id="goalDescription"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="sync-info" style="margin-top: 24px;">
+                        <h4 style="color: var(--text-primary); font-size: 1rem; margin-bottom: 12px; font-weight: 600;">💾 Data Storage & Sync</h4>
+                        <div style="background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-size: 0.9rem; line-height: 1.7; color: var(--text-secondary);">
+                            <p style="margin-bottom: 12px;"><strong style="color: var(--accent-green);">Your data is stored locally:</strong></p>
+                            <ul style="margin-left: 20px; margin-bottom: 12px;">
+                                <li style="margin-bottom: 8px;">✅ Saves automatically in your browser</li>
+                                <li style="margin-bottom: 8px;">✅ Works offline once loaded</li>
+                                <li style="margin-bottom: 8px;">✅ Private - never leaves your device</li>
+                                <li style="margin-bottom: 8px;">⚠️ Each browser stores data separately</li>
+                            </ul>
+                            
+                            <p style="margin-bottom: 8px;"><strong style="color: var(--accent-blue);">Chrome Sync Limitation:</strong></p>
+                            <p style="margin-bottom: 12px; padding: 12px; background: var(--bg-primary); border-radius: 8px; border-left: 3px solid var(--accent-orange);">
+                                ⚠️ Chrome's sync feature <strong>only works for Chrome Extensions</strong>, not web apps. To sync across Chrome devices, use one of these methods:
+                            </p>
+                            
+                            <p style="margin-bottom: 8px;"><strong style="color: var(--accent-green);">Sync Methods:</strong></p>
+                            <ol style="margin-left: 20px; margin-bottom: 12px;">
+                                <li style="margin-bottom: 8px;"><strong>Excel Export (Recommended):</strong> History → "Export Excel" → Save to Google Drive/OneDrive → Access from any device</li>
+                                <li style="margin-bottom: 8px;"><strong>JSON Backup:</strong> History → "Export JSON" → Import on other device</li>
+                                <li style="margin-bottom: 8px;"><strong>Bookmark Method:</strong> Save this page as bookmark on all Chrome devices (data still separate per device)</li>
+                            </ol>
+                            
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                                💡 <strong>Pro Tip:</strong> Export to Excel weekly and save to cloud storage for automatic access across all devices!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="food-list" id="foodList">
+            <div class="empty-state">
+                <div class="empty-icon">🍽️</div>
+                <div>No meals logged yet today</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Wait for DOM to be fully loaded before initializing
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 NutriSnap initializing...');
+            
+        // Storage key for daily logs
+        const STORAGE_KEY = 'daily-nutrition-log';
+        const HISTORY_KEY = 'nutrition-history';
+        const PROFILE_KEY = 'user-profile';
+        const LAST_EXPORT_KEY = 'last-export-date';
+        const WEIGHT_HISTORY_KEY = 'weight-history';
+        const LAST_CHECK_DATE_KEY = 'last-check-date';
+        
+        // Validation constants
+        const VALIDATION = {
+            age: { min: 13, max: 120 },
+            height: { min: 100, max: 250 },
+            weight: { min: 30, max: 300 },
+            bodyFat: { min: 3, max: 60 },
+            calories: { min: 1, max: 10000 },
+            protein: { min: 0, max: 500 },
+            carbs: { min: 0, max: 1000 },
+            maxFoodNameLength: 100,
+            maxServingLength: 100
+        };
+        
+        // Health safety thresholds
+        const HEALTH_LIMITS = {
+            minCaloriesMale: 1500,
+            minCaloriesFemale: 1200,
+            maxDeficitPercent: 30,
+            maxSurplusPercent: 20,
+            maxProteinPerKg: 3.0
+        };
+        
+        // Input sanitization
+        function sanitizeText(text) {
+            if (!text) return '';
+            // Remove HTML tags and limit length
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML.substring(0, VALIDATION.maxFoodNameLength);
+        }
+        
+        // Validate numeric input
+        function validateNumber(value, min, max, fieldName) {
+            const num = parseFloat(value);
+            if (isNaN(num)) {
+                throw new Error(`${fieldName} must be a valid number`);
+            }
+            if (num < 0) {
+                throw new Error(`${fieldName} cannot be negative`);
+            }
+            if (num < min || num > max) {
+                throw new Error(`${fieldName} must be between ${min} and ${max}`);
+            }
+            return num;
+        }
+        
+        // Check for dangerous calorie levels
+        function checkHealthSafety(calories, sex, tdee) {
+            const warnings = [];
+            
+            // Check minimum calories
+            const minCalories = sex === 'male' ? HEALTH_LIMITS.minCaloriesMale : HEALTH_LIMITS.minCaloriesFemale;
+            if (calories < minCalories) {
+                warnings.push(`⚠️ WARNING: Daily calories (${calories}) are below the recommended minimum of ${minCalories} kcal for ${sex}s. This may be unsafe without medical supervision.`);
+            }
+            
+            // Check extreme deficit
+            const deficit = ((tdee - calories) / tdee) * 100;
+            if (deficit > HEALTH_LIMITS.maxDeficitPercent) {
+                warnings.push(`⚠️ WARNING: Your calorie deficit is ${Math.round(deficit)}%, which exceeds the safe maximum of ${HEALTH_LIMITS.maxDeficitPercent}%. This may lead to muscle loss and metabolic issues.`);
+            }
+            
+            // Check extreme surplus
+            const surplus = ((calories - tdee) / tdee) * 100;
+            if (surplus > HEALTH_LIMITS.maxSurplusPercent) {
+                warnings.push(`⚠️ CAUTION: Your calorie surplus is ${Math.round(surplus)}%, which exceeds ${HEALTH_LIMITS.maxSurplusPercent}%. This may lead to excessive fat gain.`);
+            }
+            
+            return warnings;
+        }
+        
+        // Check protein safety
+        function checkProteinSafety(protein, weight) {
+            const proteinPerKg = protein / weight;
+            if (proteinPerKg > HEALTH_LIMITS.maxProteinPerKg) {
+                return `⚠️ CAUTION: Protein intake (${protein}g = ${proteinPerKg.toFixed(1)}g/kg) exceeds ${HEALTH_LIMITS.maxProteinPerKg}g/kg. Very high protein intake may stress kidneys in some individuals.`;
+            }
+            return null;
+        }
+        
+        // Check for backup reminder
+        function checkBackupReminder() {
+            const lastExport = localStorage.getItem(LAST_EXPORT_KEY);
+            if (!lastExport) return;
+            
+            const daysSinceExport = Math.floor((Date.now() - parseInt(lastExport)) / (1000 * 60 * 60 * 24));
+            if (daysSinceExport >= 30 && nutritionHistory.length > 0) {
+                setTimeout(() => {
+                    if (confirm('📊 Backup Reminder: It\'s been ' + daysSinceExport + ' days since your last export.\n\nWould you like to backup your data now?')) {
+                        document.querySelector('[data-tab="history"]').click();
+                    }
+                }, 2000);
+            }
+        }
+        
+        // Validate food item
+        function validateFoodItem(food) {
+            const errors = [];
+            
+            if (!food.name || food.name.trim().length === 0) {
+                errors.push('Food name is required');
+            }
+            
+            try {
+                validateNumber(food.calories, VALIDATION.calories.min, VALIDATION.calories.max, 'Calories');
+            } catch (e) {
+                errors.push(e.message);
+            }
+            
+            // Allow 0 for protein and carbs
+            if (food.protein < 0 || food.protein > VALIDATION.protein.max) {
+                errors.push(`Protein must be between 0 and ${VALIDATION.protein.max}`);
+            }
+            
+            if (food.carbs < 0 || food.carbs > VALIDATION.carbs.max) {
+                errors.push(`Carbs must be between 0 and ${VALIDATION.carbs.max}`);
+            }
+            
+            return errors;
+        }
+        
+        // Comprehensive food database with nutritional information
+        const foodDatabase = [
+            // === FRUITS ===
+            { name: "Apple - Fresh", calories: 95, protein: 0.5, carbs: 25, serving: "1 medium (182g)" },
+            { name: "Apple - Sliced", calories: 95, protein: 0.5, carbs: 25, serving: "1 medium (182g)" },
+            { name: "Apple - Baked", calories: 105, protein: 0.5, carbs: 27, serving: "1 medium (182g)" },
+            { name: "Banana - Fresh", calories: 105, protein: 1.3, carbs: 27, serving: "1 medium (118g)" },
+            { name: "Banana - Ripe", calories: 110, protein: 1.3, carbs: 28, serving: "1 medium (118g)" },
+            { name: "Orange - Fresh", calories: 62, protein: 1.2, carbs: 15, serving: "1 medium (131g)" },
+            { name: "Orange - Mandarin", calories: 47, protein: 0.7, carbs: 12, serving: "1 medium (88g)" },
+            { name: "Strawberries - Fresh", calories: 49, protein: 1, carbs: 12, serving: "1 cup (152g)" },
+            { name: "Strawberries - Sliced", calories: 49, protein: 1, carbs: 12, serving: "1 cup (152g)" },
+            { name: "Blueberries - Fresh", calories: 84, protein: 1.1, carbs: 21, serving: "1 cup (148g)" },
+            { name: "Blueberries - Frozen", calories: 79, protein: 1, carbs: 19, serving: "1 cup (148g)" },
+            { name: "Grapes - Green", calories: 104, protein: 1.1, carbs: 27, serving: "1 cup (151g)" },
+            { name: "Grapes - Red", calories: 104, protein: 1.1, carbs: 27, serving: "1 cup (151g)" },
+            { name: "Grapes - Black", calories: 112, protein: 1.2, carbs: 29, serving: "1 cup (151g)" },
+            { name: "Watermelon - Fresh", calories: 46, protein: 0.9, carbs: 12, serving: "1 cup (154g)" },
+            { name: "Watermelon - Cubed", calories: 46, protein: 0.9, carbs: 12, serving: "1 cup (154g)" },
+            { name: "Mango - Fresh", calories: 99, protein: 1.4, carbs: 25, serving: "1 cup (165g)" },
+            { name: "Mango - Ripe", calories: 99, protein: 1.4, carbs: 25, serving: "1 cup (165g)" },
+            { name: "Mango - Dried", calories: 319, protein: 2.8, carbs: 79, serving: "1 cup (165g)" },
+            { name: "Pineapple - Fresh", calories: 82, protein: 0.9, carbs: 22, serving: "1 cup (165g)" },
+            { name: "Pineapple - Chunks", calories: 82, protein: 0.9, carbs: 22, serving: "1 cup (165g)" },
+            { name: "Peach - Fresh", calories: 59, protein: 1.4, carbs: 14, serving: "1 medium (150g)" },
+            { name: "Peach - Sliced", calories: 59, protein: 1.4, carbs: 14, serving: "1 medium (150g)" },
+            { name: "Pear - Fresh", calories: 101, protein: 0.6, carbs: 27, serving: "1 medium (178g)" },
+            { name: "Pear - Asian", calories: 116, protein: 1.4, carbs: 30, serving: "1 medium (275g)" },
+            { name: "Kiwi - Fresh", calories: 42, protein: 0.8, carbs: 10, serving: "1 medium (69g)" },
+            { name: "Kiwi - Golden", calories: 46, protein: 0.9, carbs: 11, serving: "1 medium (69g)" },
+            { name: "Cherries - Fresh", calories: 87, protein: 1.5, carbs: 22, serving: "1 cup (154g)" },
+            { name: "Cherries - Sweet", calories: 87, protein: 1.5, carbs: 22, serving: "1 cup (154g)" },
+            { name: "Cherries - Sour", calories: 78, protein: 1.6, carbs: 19, serving: "1 cup (155g)" },
+            { name: "Raspberries - Fresh", calories: 64, protein: 1.5, carbs: 15, serving: "1 cup (123g)" },
+            { name: "Raspberries - Frozen", calories: 64, protein: 1.5, carbs: 15, serving: "1 cup (123g)" },
+            { name: "Blackberries - Fresh", calories: 62, protein: 2, carbs: 14, serving: "1 cup (144g)" },
+            { name: "Blackberries - Frozen", calories: 97, protein: 1.8, carbs: 24, serving: "1 cup (151g)" },
+            { name: "Grapefruit - Pink", calories: 52, protein: 0.9, carbs: 13, serving: "1/2 medium (123g)" },
+            { name: "Grapefruit - White", calories: 52, protein: 0.9, carbs: 13, serving: "1/2 medium (123g)" },
+            { name: "Cantaloupe - Fresh", calories: 53, protein: 1.3, carbs: 13, serving: "1 cup (177g)" },
+            { name: "Cantaloupe - Cubed", calories: 53, protein: 1.3, carbs: 13, serving: "1 cup (177g)" },
+            { name: "Plum - Fresh", calories: 30, protein: 0.5, carbs: 8, serving: "1 medium (66g)" },
+            { name: "Plum - Red", calories: 30, protein: 0.5, carbs: 8, serving: "1 medium (66g)" },
+            { name: "Apricot - Fresh", calories: 17, protein: 0.5, carbs: 4, serving: "1 medium (35g)" },
+            { name: "Apricot - Dried", calories: 241, protein: 3.4, carbs: 63, serving: "1 cup (130g)" },
+            { name: "Papaya - Fresh", calories: 62, protein: 0.7, carbs: 16, serving: "1 cup (145g)" },
+            { name: "Papaya - Ripe", calories: 62, protein: 0.7, carbs: 16, serving: "1 cup (145g)" },
+            { name: "Lychee - Fresh", calories: 66, protein: 0.8, carbs: 17, serving: "1 cup (190g)" },
+            { name: "Lychee - Peeled", calories: 66, protein: 0.8, carbs: 17, serving: "1 cup (190g)" },
+            { name: "Dragon Fruit - White", calories: 60, protein: 1.2, carbs: 13, serving: "1 cup (227g)" },
+            { name: "Dragon Fruit - Red", calories: 60, protein: 1.2, carbs: 13, serving: "1 cup (227g)" },
+            { name: "Persimmon - Fuyu", calories: 118, protein: 1, carbs: 31, serving: "1 medium (168g)" },
+            { name: "Persimmon - Hachiya", calories: 118, protein: 1, carbs: 31, serving: "1 medium (168g)" },
+            { name: "Pomegranate - Seeds", calories: 83, protein: 1.7, carbs: 19, serving: "1/2 cup (87g)" },
+            { name: "Pomegranate - Fresh", calories: 234, protein: 4.7, carbs: 52, serving: "1 medium (282g)" },
+            { name: "Starfruit - Fresh", calories: 28, protein: 1, carbs: 6, serving: "1 medium (91g)" },
+            { name: "Guava - Fresh", calories: 37, protein: 1.4, carbs: 8, serving: "1 medium (55g)" },
+            { name: "Guava - Pink", calories: 37, protein: 1.4, carbs: 8, serving: "1 medium (55g)" },
+            { name: "Passion Fruit - Fresh", calories: 17, protein: 0.4, carbs: 4, serving: "1 medium (18g)" },
+            { name: "Fig - Fresh", calories: 74, protein: 0.8, carbs: 19, serving: "1 large (64g)" },
+            { name: "Fig - Dried", calories: 249, protein: 3.3, carbs: 64, serving: "1 cup (149g)" },
+            { name: "Date - Fresh", calories: 20, protein: 0.2, carbs: 5, serving: "1 date (7g)" },
+            { name: "Date - Dried", calories: 66, protein: 0.4, carbs: 18, serving: "1 date (24g)" },
+            { name: "Rambutan - Fresh", calories: 68, protein: 0.9, carbs: 16, serving: "1 cup (152g)" },
+            { name: "Mangosteen - Fresh", calories: 73, protein: 0.6, carbs: 18, serving: "1 cup (196g)" },
+            { name: "Durian - Fresh", calories: 357, protein: 3.6, carbs: 66, serving: "1 cup (243g)" },
+            { name: "Jackfruit - Fresh", calories: 95, protein: 1.7, carbs: 24, serving: "1 cup (165g)" },
+            { name: "Longan - Fresh", calories: 60, protein: 1.3, carbs: 15, serving: "1 cup (190g)" },
+            
+            // === VEGETABLES ===
+            { name: "Broccoli - Fresh", calories: 55, protein: 3.7, carbs: 11, serving: "1 cup (156g)" },
+            { name: "Broccoli - Steamed", calories: 55, protein: 3.7, carbs: 11, serving: "1 cup (156g)" },
+            { name: "Broccoli - Stir Fried", calories: 75, protein: 3.5, carbs: 12, serving: "1 cup (156g)" },
+            { name: "Broccoli - Roasted", calories: 65, protein: 3.6, carbs: 11, serving: "1 cup (156g)" },
+            { name: "Carrots - Fresh", calories: 52, protein: 1.2, carbs: 12, serving: "1 cup (128g)" },
+            { name: "Carrots - Raw", calories: 52, protein: 1.2, carbs: 12, serving: "1 cup (128g)" },
+            { name: "Carrots - Steamed", calories: 55, protein: 1.2, carbs: 13, serving: "1 cup (156g)" },
+            { name: "Carrots - Roasted", calories: 82, protein: 1.2, carbs: 19, serving: "1 cup (156g)" },
+            { name: "Spinach - Fresh", calories: 7, protein: 0.9, carbs: 1.1, serving: "1 cup (30g)" },
+            { name: "Spinach - Raw", calories: 7, protein: 0.9, carbs: 1.1, serving: "1 cup (30g)" },
+            { name: "Spinach - Cooked", calories: 41, protein: 5.4, carbs: 7, serving: "1 cup (180g)" },
+            { name: "Spinach - Steamed", calories: 41, protein: 5.4, carbs: 7, serving: "1 cup (180g)" },
+            { name: "Spinach - Stir Fried", calories: 55, protein: 5.2, carbs: 8, serving: "1 cup (180g)" },
+            { name: "Tomato - Fresh", calories: 22, protein: 1.1, carbs: 4.8, serving: "1 medium (123g)" },
+            { name: "Tomato - Cherry", calories: 27, protein: 1.3, carbs: 6, serving: "1 cup (149g)" },
+            { name: "Tomato - Grape", calories: 27, protein: 1.3, carbs: 6, serving: "1 cup (149g)" },
+            { name: "Tomato - Roma", calories: 11, protein: 0.5, carbs: 2.4, serving: "1 medium (62g)" },
+            { name: "Tomato - Stewed", calories: 33, protein: 1.5, carbs: 7.9, serving: "1 cup (255g)" },
+            { name: "Cucumber - Fresh", calories: 16, protein: 0.7, carbs: 3.6, serving: "1 cup (104g)" },
+            { name: "Cucumber - Sliced", calories: 16, protein: 0.7, carbs: 3.6, serving: "1 cup (104g)" },
+            { name: "Cucumber - Pickled", calories: 11, protein: 0.3, carbs: 2.3, serving: "1 medium (65g)" },
+            { name: "Bell Pepper - Red", calories: 30, protein: 1, carbs: 7, serving: "1 medium (119g)" },
+            { name: "Bell Pepper - Green", calories: 24, protein: 1, carbs: 5.5, serving: "1 medium (119g)" },
+            { name: "Bell Pepper - Yellow", calories: 27, protein: 1, carbs: 6.3, serving: "1 medium (119g)" },
+            { name: "Bell Pepper - Orange", calories: 30, protein: 1, carbs: 7, serving: "1 medium (119g)" },
+            { name: "Bell Pepper - Roasted", calories: 38, protein: 1.2, carbs: 9, serving: "1 medium (119g)" },
+            { name: "Cauliflower - Fresh", calories: 25, protein: 2, carbs: 5, serving: "1 cup (100g)" },
+            { name: "Cauliflower - Steamed", calories: 28, protein: 2.3, carbs: 5.7, serving: "1 cup (124g)" },
+            { name: "Cauliflower - Roasted", calories: 40, protein: 2.1, carbs: 7, serving: "1 cup (107g)" },
+            { name: "Cauliflower - Rice", calories: 25, protein: 2, carbs: 5, serving: "1 cup (100g)" },
+            { name: "Zucchini - Fresh", calories: 20, protein: 1.5, carbs: 3.9, serving: "1 cup (124g)" },
+            { name: "Zucchini - Raw", calories: 20, protein: 1.5, carbs: 3.9, serving: "1 cup (124g)" },
+            { name: "Zucchini - Grilled", calories: 27, protein: 2, carbs: 5, serving: "1 cup (154g)" },
+            { name: "Zucchini - Stir Fried", calories: 35, protein: 1.8, carbs: 6, serving: "1 cup (154g)" },
+            { name: "Asparagus - Fresh", calories: 27, protein: 3, carbs: 5, serving: "1 cup (134g)" },
+            { name: "Asparagus - Steamed", calories: 27, protein: 3, carbs: 5, serving: "1 cup (134g)" },
+            { name: "Asparagus - Grilled", calories: 32, protein: 3.2, carbs: 6, serving: "1 cup (134g)" },
+            { name: "Asparagus - Roasted", calories: 40, protein: 4.3, carbs: 7.4, serving: "1 cup (180g)" },
+            { name: "Green Beans - Fresh", calories: 44, protein: 2.4, carbs: 10, serving: "1 cup (125g)" },
+            { name: "Green Beans - Steamed", calories: 44, protein: 2.4, carbs: 10, serving: "1 cup (125g)" },
+            { name: "Green Beans - Stir Fried", calories: 60, protein: 2.3, carbs: 11, serving: "1 cup (125g)" },
+            { name: "Brussels Sprouts - Fresh", calories: 56, protein: 4, carbs: 11, serving: "1 cup (156g)" },
+            { name: "Brussels Sprouts - Roasted", calories: 56, protein: 4, carbs: 11, serving: "1 cup (156g)" },
+            { name: "Brussels Sprouts - Steamed", calories: 56, protein: 4, carbs: 11, serving: "1 cup (156g)" },
+            { name: "Kale - Fresh", calories: 33, protein: 2.9, carbs: 6, serving: "1 cup (67g)" },
+            { name: "Kale - Raw", calories: 33, protein: 2.9, carbs: 6, serving: "1 cup (67g)" },
+            { name: "Kale - Steamed", calories: 42, protein: 3.5, carbs: 7.3, serving: "1 cup (130g)" },
+            { name: "Kale - Stir Fried", calories: 55, protein: 3.3, carbs: 8, serving: "1 cup (130g)" },
+            { name: "Lettuce - Romaine", calories: 8, protein: 0.6, carbs: 1.5, serving: "1 cup (47g)" },
+            { name: "Lettuce - Iceberg", calories: 5, protein: 0.5, carbs: 1, serving: "1 cup (36g)" },
+            { name: "Lettuce - Butter", calories: 7, protein: 0.7, carbs: 1.1, serving: "1 cup (55g)" },
+            { name: "Lettuce - Red Leaf", calories: 4, protein: 0.4, carbs: 0.7, serving: "1 cup (28g)" },
+            { name: "Celery - Fresh", calories: 14, protein: 0.7, carbs: 3, serving: "1 cup (101g)" },
+            { name: "Celery - Raw", calories: 14, protein: 0.7, carbs: 3, serving: "1 cup (101g)" },
+            { name: "Celery - Cooked", calories: 27, protein: 1.2, carbs: 6, serving: "1 cup (150g)" },
+            { name: "Onion - Yellow", calories: 44, protein: 1.2, carbs: 10, serving: "1 medium (110g)" },
+            { name: "Onion - Red", calories: 44, protein: 1.2, carbs: 10, serving: "1 medium (110g)" },
+            { name: "Onion - White", calories: 44, protein: 1.2, carbs: 10, serving: "1 medium (110g)" },
+            { name: "Onion - Green/Scallion", calories: 32, protein: 1.8, carbs: 7.3, serving: "1 cup (100g)" },
+            { name: "Onion - Caramelized", calories: 68, protein: 1.1, carbs: 16, serving: "1 medium (110g)" },
+            { name: "Garlic - Fresh", calories: 4, protein: 0.2, carbs: 1, serving: "1 clove (3g)" },
+            { name: "Garlic - Roasted", calories: 4, protein: 0.2, carbs: 1, serving: "1 clove (3g)" },
+            { name: "Mushrooms - White", calories: 22, protein: 3.1, carbs: 3.3, serving: "1 cup (96g)" },
+            { name: "Mushrooms - Portobello", calories: 29, protein: 2.9, carbs: 5.3, serving: "1 cup (121g)" },
+            { name: "Mushrooms - Shiitake", calories: 81, protein: 2.3, carbs: 21, serving: "1 cup (145g)" },
+            { name: "Mushrooms - Oyster", calories: 42, protein: 5.2, carbs: 6.8, serving: "1 cup (150g)" },
+            { name: "Mushrooms - Enoki", calories: 37, protein: 2.7, carbs: 7.8, serving: "1 cup (90g)" },
+            { name: "Mushrooms - Stir Fried", calories: 40, protein: 3.5, carbs: 5, serving: "1 cup (156g)" },
+            { name: "Eggplant - Fresh", calories: 35, protein: 1.4, carbs: 8.6, serving: "1 cup (99g)" },
+            { name: "Eggplant - Grilled", calories: 35, protein: 1.4, carbs: 8.6, serving: "1 cup (99g)" },
+            { name: "Eggplant - Stir Fried", calories: 55, protein: 1.3, carbs: 10, serving: "1 cup (99g)" },
+            { name: "Eggplant - Chinese", calories: 38, protein: 1.5, carbs: 9, serving: "1 cup (99g)" },
+            { name: "Cabbage - Green", calories: 22, protein: 1.1, carbs: 5.2, serving: "1 cup (89g)" },
+            { name: "Cabbage - Red", calories: 28, protein: 1.3, carbs: 6.9, serving: "1 cup (89g)" },
+            { name: "Cabbage - Napa", calories: 12, protein: 1.2, carbs: 2.4, serving: "1 cup (76g)" },
+            { name: "Cabbage - Stir Fried", calories: 35, protein: 1.5, carbs: 7, serving: "1 cup (150g)" },
+            { name: "Bok Choy - Fresh", calories: 9, protein: 1.1, carbs: 1.5, serving: "1 cup (70g)" },
+            { name: "Bok Choy - Steamed", calories: 20, protein: 2.7, carbs: 3, serving: "1 cup (170g)" },
+            { name: "Bok Choy - Stir Fried", calories: 30, protein: 2.5, carbs: 4, serving: "1 cup (170g)" },
+            { name: "Bok Choy - Baby", calories: 9, protein: 1.1, carbs: 1.5, serving: "1 cup (70g)" },
+            { name: "Corn - Yellow", calories: 123, protein: 4.7, carbs: 27, serving: "1 cup (154g)" },
+            { name: "Corn - Sweet", calories: 123, protein: 4.7, carbs: 27, serving: "1 cup (154g)" },
+            { name: "Corn - Baby", calories: 42, protein: 1.9, carbs: 9, serving: "1 cup (130g)" },
+            { name: "Corn - Grilled", calories: 111, protein: 3.4, carbs: 25, serving: "1 ear (90g)" },
+            { name: "Peas - Green", calories: 117, protein: 7.9, carbs: 21, serving: "1 cup (160g)" },
+            { name: "Peas - Snow", calories: 41, protein: 2.7, carbs: 7.4, serving: "1 cup (98g)" },
+            { name: "Peas - Snap", calories: 41, protein: 2.7, carbs: 7.4, serving: "1 cup (98g)" },
+            { name: "Radish - Red", calories: 19, protein: 0.8, carbs: 4, serving: "1 cup (116g)" },
+            { name: "Radish - Daikon", calories: 18, protein: 0.6, carbs: 4.1, serving: "1 cup (116g)" },
+            { name: "Beets - Fresh", calories: 58, protein: 2.2, carbs: 13, serving: "1 cup (136g)" },
+            { name: "Beets - Roasted", calories: 75, protein: 2.9, carbs: 17, serving: "1 cup (170g)" },
+            { name: "Squash - Butternut", calories: 63, protein: 1.4, carbs: 16, serving: "1 cup (140g)" },
+            { name: "Squash - Acorn", calories: 56, protein: 1.1, carbs: 15, serving: "1 cup (140g)" },
+            { name: "Squash - Spaghetti", calories: 31, protein: 0.6, carbs: 7, serving: "1 cup (101g)" },
+            { name: "Squash - Yellow", calories: 25, protein: 1.6, carbs: 5.4, serving: "1 cup (113g)" },
+            { name: "Pumpkin - Fresh", calories: 30, protein: 1.2, carbs: 7.5, serving: "1 cup (116g)" },
+            { name: "Pumpkin - Roasted", calories: 49, protein: 1.8, carbs: 12, serving: "1 cup (245g)" },
+            { name: "Seaweed - Nori", calories: 35, protein: 5.8, carbs: 5.1, serving: "1 cup (100g)" },
+            { name: "Seaweed - Wakame", calories: 45, protein: 3, carbs: 9, serving: "1 cup (100g)" },
+            { name: "Seaweed - Kombu", calories: 43, protein: 1.7, carbs: 9.6, serving: "1 cup (100g)" },
+            { name: "Bean Sprouts - Mung", calories: 31, protein: 3.2, carbs: 6.2, serving: "1 cup (104g)" },
+            { name: "Bean Sprouts - Soy", calories: 85, protein: 9.2, carbs: 9.5, serving: "1 cup (70g)" },
+            { name: "Water Chestnuts - Fresh", calories: 97, protein: 1.4, carbs: 23.9, serving: "1 cup (124g)" },
+            { name: "Bamboo Shoots - Fresh", calories: 41, protein: 3.9, carbs: 7.9, serving: "1 cup (151g)" },
+            { name: "Lotus Root - Fresh", calories: 74, protein: 2.6, carbs: 17.2, serving: "1 cup (120g)" },
+            
+            // Proteins - Meats
+            // === CHICKEN ===
+            { name: "Chicken Breast", calories: 165, protein: 31, carbs: 0, serving: "100g" },
+            { name: "Chicken Breast - Grilled", calories: 165, protein: 31, carbs: 0, serving: "100g" },
+            { name: "Chicken Breast - Stir Fried", calories: 185, protein: 28, carbs: 3, serving: "100g" },
+            { name: "Chicken Thigh", calories: 209, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Chicken Thigh - Grilled", calories: 209, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Chicken Thigh - Braised", calories: 220, protein: 25, carbs: 2, serving: "100g" },
+            { name: "Chicken Wings", calories: 203, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Chicken Wings - Fried", calories: 290, protein: 27, carbs: 10, serving: "100g" },
+            { name: "Chicken Wings - Honey Glazed", calories: 250, protein: 26, carbs: 12, serving: "100g" },
+            { name: "Chicken Drumstick", calories: 172, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Chicken Drumstick - Braised", calories: 185, protein: 27, carbs: 3, serving: "100g" },
+            { name: "Chicken Liver", calories: 167, protein: 25, carbs: 0.9, serving: "100g" },
+            { name: "Chicken Tenders", calories: 263, protein: 18, carbs: 13, serving: "100g" },
+            { name: "Chicken Feet (Phoenix Claws)", calories: 215, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Chicken Feet - Braised Black Bean", calories: 230, protein: 18, carbs: 5, serving: "100g" },
+            { name: "Chicken Feet - Dim Sum Style", calories: 225, protein: 19, carbs: 4, serving: "100g" },
+            { name: "Chicken Gizzard", calories: 154, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Chicken Heart", calories: 185, protein: 26, carbs: 0.7, serving: "100g" },
+            { name: "Chicken Neck", calories: 180, protein: 21, carbs: 0, serving: "100g" },
+            { name: "Chicken Skin", calories: 454, protein: 16, carbs: 0, serving: "100g" },
+            { name: "Chicken - Whole Roasted", calories: 239, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Chicken Leg Quarter", calories: 211, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Chicken Back", calories: 237, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Chicken - Silkie (Black Chicken)", calories: 180, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Chicken - Soy Sauce", calories: 195, protein: 29, carbs: 5, serving: "100g" },
+            { name: "Chicken - White Cut (Bai Qie Ji)", calories: 165, protein: 31, carbs: 0, serving: "100g" },
+            { name: "Chicken - Char Siu Style", calories: 220, protein: 26, carbs: 8, serving: "100g" },
+            { name: "Chicken - Salt Baked", calories: 190, protein: 30, carbs: 2, serving: "100g" },
+            { name: "Chicken - Kung Pao", calories: 180, protein: 21, carbs: 12, serving: "100g" },
+            { name: "Chicken - General Tso's", calories: 295, protein: 19, carbs: 26, serving: "100g" },
+            { name: "Chicken - Orange", calories: 283, protein: 15, carbs: 28, serving: "100g" },
+            { name: "Chicken - Sweet and Sour", calories: 240, protein: 17, carbs: 22, serving: "100g" },
+            { name: "Chicken - Sesame", calories: 295, protein: 16, carbs: 24, serving: "100g" },
+            { name: "Chicken - Lemon", calories: 220, protein: 18, carbs: 15, serving: "100g" },
+            { name: "Chicken - Cashew", calories: 200, protein: 20, carbs: 10, serving: "100g" },
+            { name: "Chicken - Mongolian", calories: 185, protein: 22, carbs: 11, serving: "100g" },
+            { name: "Chicken - Hunan", calories: 175, protein: 23, carbs: 9, serving: "100g" },
+            { name: "Chicken - Szechuan", calories: 178, protein: 22, carbs: 10, serving: "100g" },
+            { name: "Chicken - Black Pepper", calories: 188, protein: 24, carbs: 8, serving: "100g" },
+            { name: "Chicken - Three Cup (San Bei Ji)", calories: 205, protein: 26, carbs: 6, serving: "100g" },
+            { name: "Chicken - Drunken", calories: 175, protein: 29, carbs: 3, serving: "100g" },
+            { name: "Chicken - Tea Smoked", calories: 182, protein: 28, carbs: 2, serving: "100g" },
+            { name: "Chicken - Teriyaki", calories: 198, protein: 25, carbs: 10, serving: "100g" },
+            { name: "Chicken - Yakitori", calories: 170, protein: 27, carbs: 5, serving: "100g" },
+            { name: "Chicken - Katsu (Breaded)", calories: 280, protein: 22, carbs: 18, serving: "100g" },
+            { name: "Chicken - Karaage (Japanese Fried)", calories: 275, protein: 24, carbs: 15, serving: "100g" },
+            { name: "Chicken - Ginger Scallion", calories: 185, protein: 28, carbs: 4, serving: "100g" },
+            { name: "Chicken - Steamed with Mushroom", calories: 155, protein: 29, carbs: 3, serving: "100g" },
+            { name: "Chicken - Claypot Rice", calories: 190, protein: 26, carbs: 8, serving: "100g" },
+            { name: "Chicken - Hainanese", calories: 175, protein: 30, carbs: 2, serving: "100g" },
+            { name: "Chicken - Rendang", calories: 235, protein: 24, carbs: 8, serving: "100g" },
+            { name: "Chicken - Curry", calories: 210, protein: 22, carbs: 12, serving: "100g" },
+            { name: "Chicken - Thai Basil", calories: 180, protein: 26, carbs: 7, serving: "100g" },
+            { name: "Chicken - Vietnamese Lemongrass", calories: 175, protein: 27, carbs: 5, serving: "100g" },
+            { name: "Chicken - Korean BBQ", calories: 200, protein: 26, carbs: 8, serving: "100g" },
+            { name: "Chicken - Bulgogi Style", calories: 205, protein: 25, carbs: 9, serving: "100g" },
+            
+            // === BEEF ===
+            { name: "Beef - Ribeye Steak", calories: 291, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Beef - Ribeye Grilled", calories: 291, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Beef - Ribeye Stir Fried", calories: 305, protein: 24, carbs: 3, serving: "100g" },
+            { name: "Beef - Sirloin Steak", calories: 271, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Beef - Sirloin Grilled", calories: 271, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Beef - Sirloin Stir Fried", calories: 285, protein: 24, carbs: 3, serving: "100g" },
+            { name: "Beef - T-Bone Steak", calories: 247, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Beef - Filet Mignon", calories: 227, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Beef - Flank Steak", calories: 192, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Beef - Flank Stir Fried", calories: 210, protein: 26, carbs: 4, serving: "100g" },
+            { name: "Beef - Strip Steak", calories: 210, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Beef - Rump Steak", calories: 196, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Beef - Rump Stir Fried", calories: 215, protein: 25, carbs: 4, serving: "100g" },
+            { name: "Beef - Tenderloin", calories: 227, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Beef - Short Ribs", calories: 471, protein: 16, carbs: 0, serving: "100g" },
+            { name: "Beef - Short Ribs Braised", calories: 485, protein: 15, carbs: 5, serving: "100g" },
+            { name: "Beef - Chuck Roast", calories: 277, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Beef - Brisket", calories: 288, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Beef - Brisket Braised", calories: 300, protein: 25, carbs: 3, serving: "100g" },
+            { name: "Beef - Ground (90% lean)", calories: 176, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Beef - Ground (80% lean)", calories: 254, protein: 17, carbs: 0, serving: "100g" },
+            { name: "Beef - Ground (70% lean)", calories: 332, protein: 14, carbs: 0, serving: "100g" },
+            { name: "Beef - Liver", calories: 175, protein: 27, carbs: 5, serving: "100g" },
+            { name: "Beef - Tripe", calories: 94, protein: 15, carbs: 0, serving: "100g" },
+            { name: "Beef - Tongue", calories: 284, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Beef - Oxtail", calories: 262, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Beef - Oxtail Braised", calories: 275, protein: 29, carbs: 3, serving: "100g" },
+            { name: "Beef - Shank", calories: 185, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Beef - Jerky", calories: 410, protein: 33, carbs: 11, serving: "100g" },
+            { name: "Beef - Corned", calories: 251, protein: 18, carbs: 0.5, serving: "100g" },
+            { name: "Beef - Roast", calories: 150, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Beef - Pastrami", calories: 198, protein: 20, carbs: 3.4, serving: "100g" },
+            { name: "Beef - Bulgogi", calories: 230, protein: 23, carbs: 10, serving: "100g" },
+            { name: "Beef - Korean BBQ", calories: 240, protein: 22, carbs: 9, serving: "100g" },
+            { name: "Beef - Teriyaki", calories: 220, protein: 24, carbs: 12, serving: "100g" },
+            { name: "Beef - Mongolian", calories: 235, protein: 21, carbs: 14, serving: "100g" },
+            { name: "Beef - Black Pepper", calories: 245, protein: 23, carbs: 8, serving: "100g" },
+            { name: "Beef - Szechuan", calories: 225, protein: 24, carbs: 10, serving: "100g" },
+            { name: "Beef - Hunan", calories: 218, protein: 25, carbs: 8, serving: "100g" },
+            { name: "Beef - Broccoli", calories: 200, protein: 22, carbs: 12, serving: "100g" },
+            { name: "Beef - Oyster Sauce", calories: 210, protein: 24, carbs: 8, serving: "100g" },
+            { name: "Beef - Ginger Scallion", calories: 215, protein: 25, carbs: 5, serving: "100g" },
+            { name: "Beef - Satay", calories: 245, protein: 22, carbs: 8, serving: "100g" },
+            { name: "Beef - Rendang", calories: 280, protein: 20, carbs: 10, serving: "100g" },
+            { name: "Beef - Pho (in soup)", calories: 155, protein: 24, carbs: 2, serving: "100g" },
+            { name: "Beef - Shabu Shabu", calories: 180, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Beef - Sukiyaki", calories: 195, protein: 24, carbs: 5, serving: "100g" },
+            { name: "Beef - Yakiniku", calories: 250, protein: 23, carbs: 3, serving: "100g" },
+            { name: "Beef - Tataki (Seared)", calories: 165, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Beef - Curry", calories: 230, protein: 21, carbs: 13, serving: "100g" },
+            { name: "Beef - Meatballs", calories: 235, protein: 15, carbs: 8, serving: "100g" },
+            { name: "Beef - Meatloaf", calories: 245, protein: 17, carbs: 9, serving: "100g" },
+            { name: "Beef - Patty", calories: 332, protein: 14, carbs: 0, serving: "100g" },
+            
+            // === PORK ===
+            { name: "Pork - Chop", calories: 231, protein: 23, carbs: 0, serving: "100g" },
+            { name: "Pork - Chop Grilled", calories: 231, protein: 23, carbs: 0, serving: "100g" },
+            { name: "Pork - Chop Fried", calories: 270, protein: 21, carbs: 8, serving: "100g" },
+            { name: "Pork - Tenderloin", calories: 143, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Pork - Tenderloin Roasted", calories: 143, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Pork - Tenderloin Stir Fried", calories: 165, protein: 25, carbs: 3, serving: "100g" },
+            { name: "Pork - Loin", calories: 206, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Pork - Loin Roasted", calories: 206, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Pork - Ribs", calories: 361, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Pork - Ribs BBQ", calories: 385, protein: 19, carbs: 8, serving: "100g" },
+            { name: "Pork - Spare Ribs", calories: 397, protein: 18, carbs: 0, serving: "100g" },
+            { name: "Pork - Spare Ribs Braised", calories: 410, protein: 17, carbs: 5, serving: "100g" },
+            { name: "Pork - Shoulder", calories: 242, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Pork - Shoulder Roasted", calories: 242, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Pork - Pulled", calories: 210, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Pork - Belly", calories: 518, protein: 9, carbs: 0, serving: "100g" },
+            { name: "Pork - Belly Braised", calories: 530, protein: 8, carbs: 3, serving: "100g" },
+            { name: "Pork - Belly Crispy", calories: 545, protein: 9, carbs: 5, serving: "100g" },
+            { name: "Pork - Ground", calories: 263, protein: 18, carbs: 0, serving: "100g" },
+            { name: "Pork - Sausage", calories: 346, protein: 13, carbs: 1.2, serving: "100g" },
+            { name: "Pork - Italian Sausage", calories: 344, protein: 14, carbs: 4, serving: "100g" },
+            { name: "Pork - Bratwurst", calories: 297, protein: 12, carbs: 3.5, serving: "100g" },
+            { name: "Pork - Chorizo", calories: 455, protein: 24, carbs: 2, serving: "100g" },
+            { name: "Pork - Bacon", calories: 541, protein: 37, carbs: 1.4, serving: "100g" },
+            { name: "Pork - Canadian Bacon", calories: 185, protein: 21, carbs: 1.8, serving: "100g" },
+            { name: "Pork - Ham", calories: 145, protein: 21, carbs: 1.5, serving: "100g" },
+            { name: "Pork - Prosciutto", calories: 119, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Pork - Char Siu (BBQ)", calories: 265, protein: 22, carbs: 15, serving: "100g" },
+            { name: "Pork - Tonkatsu (Breaded)", calories: 285, protein: 20, carbs: 18, serving: "100g" },
+            { name: "Pork - Sweet and Sour", calories: 250, protein: 18, carbs: 22, serving: "100g" },
+            { name: "Pork - Twice Cooked", calories: 290, protein: 19, carbs: 10, serving: "100g" },
+            { name: "Pork - Szechuan", calories: 245, protein: 21, carbs: 12, serving: "100g" },
+            { name: "Pork - Mongolian", calories: 255, protein: 20, carbs: 14, serving: "100g" },
+            { name: "Pork - Ginger Scallion", calories: 220, protein: 22, carbs: 5, serving: "100g" },
+            { name: "Pork - Black Pepper", calories: 235, protein: 21, carbs: 8, serving: "100g" },
+            { name: "Pork - Garlic Sauce", calories: 240, protein: 20, carbs: 10, serving: "100g" },
+            { name: "Pork - Satay", calories: 260, protein: 21, carbs: 9, serving: "100g" },
+            { name: "Pork - Rendang", calories: 295, protein: 19, carbs: 11, serving: "100g" },
+            { name: "Pork - Adobo", calories: 240, protein: 22, carbs: 8, serving: "100g" },
+            { name: "Pork - Katsu Curry", calories: 300, protein: 19, carbs: 20, serving: "100g" },
+            { name: "Pork - Ginger Pork (Shogayaki)", calories: 215, protein: 23, carbs: 7, serving: "100g" },
+            { name: "Pork - Belly Bun (Gua Bao)", calories: 340, protein: 12, carbs: 28, serving: "100g" },
+            { name: "Pork - Vietnamese Grilled", calories: 205, protein: 24, carbs: 4, serving: "100g" },
+            { name: "Pork - Korean BBQ", calories: 250, protein: 21, carbs: 10, serving: "100g" },
+            { name: "Pork - Bulgogi Style", calories: 245, protein: 22, carbs: 11, serving: "100g" },
+            { name: "Pork - Kimchi Stir Fry", calories: 230, protein: 20, carbs: 12, serving: "100g" },
+            { name: "Pork - Thai Basil", calories: 225, protein: 22, carbs: 8, serving: "100g" },
+            { name: "Pork - Red Braised", calories: 265, protein: 20, carbs: 10, serving: "100g" },
+            { name: "Pork - Hock", calories: 330, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Pork - Hock Braised", calories: 345, protein: 18, carbs: 5, serving: "100g" },
+            
+            // === LAMB ===
+            { name: "Lamb - Chop", calories: 294, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Lamb - Chop Grilled", calories: 294, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Lamb - Chop Braised", calories: 310, protein: 24, carbs: 3, serving: "100g" },
+            { name: "Lamb - Leg", calories: 258, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Lamb - Leg Roasted", calories: 258, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Lamb - Leg Stir Fried", calories: 275, protein: 25, carbs: 4, serving: "100g" },
+            { name: "Lamb - Shoulder", calories: 288, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Lamb - Shoulder Roasted", calories: 288, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Lamb - Shoulder Braised", calories: 305, protein: 21, carbs: 3, serving: "100g" },
+            { name: "Lamb - Rack", calories: 311, protein: 21, carbs: 0, serving: "100g" },
+            { name: "Lamb - Ground", calories: 283, protein: 17, carbs: 0, serving: "100g" },
+            { name: "Lamb - Shank", calories: 234, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Lamb - Shank Braised", calories: 250, protein: 25, carbs: 4, serving: "100g" },
+            { name: "Lamb - Loin", calories: 268, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Lamb - Ribs", calories: 370, protein: 18, carbs: 0, serving: "100g" },
+            { name: "Lamb - Belly", calories: 385, protein: 15, carbs: 0, serving: "100g" },
+            { name: "Lamb - Curry", calories: 265, protein: 22, carbs: 14, serving: "100g" },
+            { name: "Lamb - Mongolian", calories: 270, protein: 23, carbs: 12, serving: "100g" },
+            { name: "Lamb - Szechuan", calories: 260, protein: 24, carbs: 10, serving: "100g" },
+            { name: "Lamb - Cumin", calories: 275, protein: 23, carbs: 8, serving: "100g" },
+            { name: "Lamb - Skewers (Kebab)", calories: 255, protein: 25, carbs: 5, serving: "100g" },
+            { name: "Lamb - Xinjiang Style", calories: 280, protein: 23, carbs: 7, serving: "100g" },
+            { name: "Lamb - Hot Pot", calories: 240, protein: 24, carbs: 3, serving: "100g" },
+            { name: "Lamb - Korean BBQ", calories: 285, protein: 22, carbs: 9, serving: "100g" },
+            { name: "Lamb - Rendang", calories: 310, protein: 21, carbs: 12, serving: "100g" },
+            { name: "Lamb - Rogan Josh", calories: 275, protein: 23, carbs: 11, serving: "100g" },
+            { name: "Lamb - Biryani", calories: 245, protein: 22, carbs: 15, serving: "100g" },
+            { name: "Lamb - Stir Fried with Scallion", calories: 265, protein: 24, carbs: 6, serving: "100g" },
+            { name: "Lamb - Black Pepper", calories: 270, protein: 23, carbs: 8, serving: "100g" },
+            { name: "Lamb - Satay", calories: 280, protein: 22, carbs: 9, serving: "100g" },
+            // === TURKEY ===
+            { name: "Turkey - Breast", calories: 135, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Turkey - Breast Roasted", calories: 135, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Turkey - Breast Sliced", calories: 135, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Turkey - Thigh", calories: 144, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Turkey - Thigh Roasted", calories: 144, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Turkey - Ground", calories: 149, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Turkey - Ground Lean", calories: 120, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Turkey - Bacon", calories: 206, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Turkey - Whole Roasted", calories: 189, protein: 29, carbs: 0, serving: "100g" },
+            { name: "Turkey - Drumstick", calories: 144, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Beef Steak (Sirloin)", calories: 271, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Beef Steak (Ribeye)", calories: 291, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Beef Steak (T-Bone)", calories: 247, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Beef Steak (Filet Mignon)", calories: 227, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Beef Steak (Flank)", calories: 192, protein: 27, carbs: 0, serving: "100g" },
+            { name: "Beef Steak (Strip)", calories: 210, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Ground Beef (90% lean)", calories: 176, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Ground Beef (80% lean)", calories: 254, protein: 17, carbs: 0, serving: "100g" },
+            { name: "Ground Beef (70% lean)", calories: 332, protein: 14, carbs: 0, serving: "100g" },
+            { name: "Beef Brisket", calories: 288, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Beef Short Ribs", calories: 471, protein: 16, carbs: 0, serving: "100g" },
+            { name: "Beef Chuck Roast", calories: 277, protein: 24, carbs: 0, serving: "100g" },
+            { name: "Beef Liver", calories: 175, protein: 27, carbs: 5, serving: "100g" },
+            { name: "Beef Jerky", calories: 410, protein: 33, carbs: 11, serving: "100g" },
+            { name: "Corned Beef", calories: 251, protein: 18, carbs: 0.5, serving: "100g" },
+            { name: "Roast Beef", calories: 150, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Pastrami", calories: 198, protein: 20, carbs: 3.4, serving: "100g" },
+            { name: "Pork Chop", calories: 231, protein: 23, carbs: 0, serving: "100g" },
+            { name: "Pork Tenderloin", calories: 143, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Pork Loin", calories: 206, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Pork Ribs", calories: 361, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Pork Shoulder", calories: 242, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Pulled Pork", calories: 210, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Pork Sausage", calories: 346, protein: 13, carbs: 1.2, serving: "100g" },
+            { name: "Italian Sausage", calories: 344, protein: 14, carbs: 4, serving: "100g" },
+            { name: "Bratwurst", calories: 297, protein: 12, carbs: 3.5, serving: "100g" },
+            { name: "Chorizo", calories: 455, protein: 24, carbs: 2, serving: "100g" },
+            { name: "Bacon", calories: 541, protein: 37, carbs: 1.4, serving: "100g" },
+            { name: "Canadian Bacon", calories: 185, protein: 21, carbs: 1.8, serving: "100g" },
+            { name: "Ham", calories: 145, protein: 21, carbs: 1.5, serving: "100g" },
+            { name: "Prosciutto", calories: 119, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Salami", calories: 407, protein: 23, carbs: 1.2, serving: "100g" },
+            { name: "Pepperoni", calories: 494, protein: 23, carbs: 4, serving: "100g" },
+            { name: "Bologna", calories: 310, protein: 11, carbs: 3.3, serving: "100g" },
+            { name: "Lamb Chop", calories: 294, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Lamb Leg", calories: 258, protein: 26, carbs: 0, serving: "100g" },
+            { name: "Lamb Shoulder", calories: 288, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Ground Lamb", calories: 283, protein: 17, carbs: 0, serving: "100g" },
+            { name: "Rack of Lamb", calories: 311, protein: 21, carbs: 0, serving: "100g" },
+            // === GAME MEATS ===
+            { name: "Venison - Steak", calories: 158, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Venison - Ground", calories: 159, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Venison - Roasted", calories: 158, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Elk - Steak", calories: 146, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Elk - Ground", calories: 146, protein: 30, carbs: 0, serving: "100g" },
+            { name: "Bison - Steak", calories: 146, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Bison - Ground", calories: 152, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Wild Boar - Roasted", calories: 160, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Rabbit - Roasted", calories: 173, protein: 33, carbs: 0, serving: "100g" },
+            { name: "Rabbit - Stewed", calories: 173, protein: 33, carbs: 0, serving: "100g" },
+            { name: "Quail - Roasted", calories: 227, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Ostrich - Steak", calories: 142, protein: 27, carbs: 0, serving: "100g" },
+            
+            // === DUCK & POULTRY ===
+            { name: "Duck - Whole Roasted", calories: 337, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Duck - Breast", calories: 201, protein: 23, carbs: 0, serving: "100g" },
+            { name: "Duck - Breast Roasted", calories: 201, protein: 23, carbs: 0, serving: "100g" },
+            { name: "Duck - Leg", calories: 280, protein: 21, carbs: 0, serving: "100g" },
+            { name: "Duck - Confit", calories: 337, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Duck - Chinese Style", calories: 337, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Goose - Roasted", calories: 371, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Pheasant - Roasted", calories: 239, protein: 28, carbs: 0, serving: "100g" },
+            
+            // === VEAL ===
+            { name: "Veal - Cutlet", calories: 196, protein: 31, carbs: 0, serving: "100g" },
+            { name: "Veal - Cutlet Breaded", calories: 245, protein: 28, carbs: 10, serving: "100g" },
+            { name: "Veal - Chop", calories: 228, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Veal - Ground", calories: 172, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Veal - Osso Buco", calories: 228, protein: 28, carbs: 0, serving: "100g" },
+            
+            // === DELI MEATS & PROCESSED ===
+            { name: "Salami - Italian", calories: 407, protein: 23, carbs: 1.2, serving: "100g" },
+            { name: "Salami - Genoa", calories: 429, protein: 22, carbs: 2, serving: "100g" },
+            { name: "Pepperoni - Sliced", calories: 494, protein: 23, carbs: 4, serving: "100g" },
+            { name: "Bologna - Beef", calories: 310, protein: 11, carbs: 3.3, serving: "100g" },
+            { name: "Bologna - Pork", calories: 310, protein: 11, carbs: 3.3, serving: "100g" },
+            { name: "Liverwurst - Pork", calories: 326, protein: 14, carbs: 2.2, serving: "100g" },
+            { name: "Mortadella - Italian", calories: 311, protein: 16, carbs: 3, serving: "100g" },
+            { name: "Spam - Classic", calories: 310, protein: 13, carbs: 2, serving: "100g" },
+            
+            // === SAUSAGES ===
+            { name: "Sausage - Italian", calories: 344, protein: 14, carbs: 4, serving: "100g" },
+            { name: "Sausage - Italian Sweet", calories: 344, protein: 14, carbs: 4, serving: "100g" },
+            { name: "Sausage - Italian Hot", calories: 344, protein: 14, carbs: 4, serving: "100g" },
+            { name: "Sausage - Bratwurst", calories: 297, protein: 12, carbs: 3.5, serving: "100g" },
+            { name: "Sausage - Chorizo", calories: 455, protein: 24, carbs: 2, serving: "100g" },
+            { name: "Sausage - Kielbasa", calories: 301, protein: 12, carbs: 3.4, serving: "100g" },
+            { name: "Sausage - Andouille", calories: 234, protein: 14, carbs: 2, serving: "100g" },
+            { name: "Sausage - Vienna", calories: 260, protein: 9, carbs: 2, serving: "100g" },
+            { name: "Sausage - Blood", calories: 379, protein: 15, carbs: 1, serving: "100g" },
+            { name: "Hot Dog - Beef", calories: 330, protein: 11, carbs: 2, serving: "100g" },
+            { name: "Hot Dog - Pork", calories: 290, protein: 10, carbs: 3, serving: "100g" },
+            { name: "Hot Dog - Turkey", calories: 150, protein: 12, carbs: 3, serving: "100g" },
+            
+            // Proteins - Seafood
+            { name: "Salmon", calories: 206, protein: 22, carbs: 0, serving: "100g" },
+            { name: "Tuna", calories: 128, protein: 28, carbs: 0, serving: "100g" },
+            { name: "Cod", calories: 82, protein: 18, carbs: 0, serving: "100g" },
+            { name: "Tilapia", calories: 96, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Shrimp", calories: 99, protein: 24, carbs: 0.2, serving: "100g" },
+            { name: "Lobster", calories: 89, protein: 19, carbs: 0, serving: "100g" },
+            { name: "Crab", calories: 97, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Scallops", calories: 111, protein: 20, carbs: 5, serving: "100g" },
+            { name: "Mussels", calories: 172, protein: 24, carbs: 7.4, serving: "100g" },
+            { name: "Halibut", calories: 111, protein: 23, carbs: 0, serving: "100g" },
+            { name: "Trout", calories: 141, protein: 20, carbs: 0, serving: "100g" },
+            { name: "Sardines", calories: 208, protein: 25, carbs: 0, serving: "100g" },
+            { name: "Mackerel", calories: 262, protein: 19, carbs: 0, serving: "100g" },
+            
+            // Proteins - Eggs & Dairy
+            { name: "Eggs", calories: 155, protein: 13, carbs: 1.1, serving: "2 large" },
+            { name: "Egg Whites", calories: 17, protein: 3.6, carbs: 0.2, serving: "1 large" },
+            { name: "Greek Yogurt", calories: 100, protein: 17, carbs: 6, serving: "170g" },
+            { name: "Regular Yogurt", calories: 149, protein: 8.5, carbs: 11.4, serving: "1 cup (245g)" },
+            { name: "Cottage Cheese", calories: 163, protein: 28, carbs: 6.2, serving: "1 cup (226g)" },
+            { name: "Cheese (Cheddar)", calories: 114, protein: 7, carbs: 0.4, serving: "1 oz (28g)" },
+            { name: "Cheese (Mozzarella)", calories: 85, protein: 6.3, carbs: 0.6, serving: "1 oz (28g)" },
+            { name: "Cheese (Parmesan)", calories: 122, protein: 11, carbs: 0.9, serving: "1 oz (28g)" },
+            { name: "Cheese (Feta)", calories: 75, protein: 4, carbs: 1.2, serving: "1 oz (28g)" },
+            { name: "Milk (Whole)", calories: 149, protein: 7.7, carbs: 12, serving: "1 cup (244g)" },
+            { name: "Milk (2%)", calories: 122, protein: 8, carbs: 12, serving: "1 cup (244g)" },
+            { name: "Milk (Skim)", calories: 83, protein: 8.3, carbs: 12, serving: "1 cup (245g)" },
+            { name: "Almond Milk", calories: 39, protein: 1.5, carbs: 3.4, serving: "1 cup (240g)" },
+            
+            // Proteins - Plant-Based
+            { name: "Tofu", calories: 76, protein: 8, carbs: 1.9, serving: "100g" },
+            { name: "Tempeh", calories: 193, protein: 19, carbs: 9.4, serving: "100g" },
+            { name: "Edamame", calories: 122, protein: 11, carbs: 10, serving: "1 cup (155g)" },
+            { name: "Lentils", calories: 230, protein: 18, carbs: 40, serving: "1 cup cooked (198g)" },
+            { name: "Black Beans", calories: 227, protein: 15, carbs: 41, serving: "1 cup cooked (172g)" },
+            { name: "Kidney Beans", calories: 225, protein: 15, carbs: 40, serving: "1 cup cooked (177g)" },
+            { name: "Chickpeas", calories: 269, protein: 14.5, carbs: 45, serving: "1 cup cooked (164g)" },
+            { name: "Pinto Beans", calories: 245, protein: 15, carbs: 45, serving: "1 cup cooked (171g)" },
+            { name: "Protein Shake", calories: 120, protein: 24, carbs: 3, serving: "1 scoop (30g)" },
+            
+            // Grains & Carbs
+            { name: "White Rice", calories: 205, protein: 4.2, carbs: 45, serving: "1 cup cooked (158g)" },
+            { name: "Brown Rice", calories: 218, protein: 4.5, carbs: 46, serving: "1 cup cooked (195g)" },
+            { name: "Jasmine Rice", calories: 181, protein: 4, carbs: 39, serving: "1 cup cooked (140g)" },
+            { name: "Basmati Rice", calories: 191, protein: 4, carbs: 43, serving: "1 cup cooked (140g)" },
+            { name: "Wild Rice", calories: 166, protein: 6.5, carbs: 35, serving: "1 cup cooked (164g)" },
+            { name: "Quinoa", calories: 222, protein: 8.1, carbs: 39, serving: "1 cup cooked (185g)" },
+            { name: "Oatmeal", calories: 166, protein: 5.9, carbs: 28, serving: "1 cup cooked (234g)" },
+            { name: "Whole Wheat Bread", calories: 69, protein: 3.6, carbs: 12, serving: "1 slice (28g)" },
+            { name: "White Bread", calories: 75, protein: 2.3, carbs: 14, serving: "1 slice (28g)" },
+            { name: "Sourdough Bread", calories: 74, protein: 2.9, carbs: 14, serving: "1 slice (28g)" },
+            { name: "Bagel", calories: 277, protein: 11, carbs: 55, serving: "1 medium (105g)" },
+            { name: "English Muffin", calories: 134, protein: 4.4, carbs: 26, serving: "1 muffin (57g)" },
+            { name: "Pasta", calories: 221, protein: 8.1, carbs: 43, serving: "1 cup cooked (140g)" },
+            { name: "Whole Wheat Pasta", calories: 174, protein: 7.5, carbs: 37, serving: "1 cup cooked (140g)" },
+            { name: "Spaghetti", calories: 221, protein: 8.1, carbs: 43, serving: "1 cup cooked (140g)" },
+            { name: "Couscous", calories: 176, protein: 6, carbs: 36, serving: "1 cup cooked (157g)" },
+            { name: "Sweet Potato", calories: 112, protein: 2, carbs: 26, serving: "1 medium (130g)" },
+            { name: "Potato (Baked)", calories: 161, protein: 4.3, carbs: 37, serving: "1 medium (173g)" },
+            { name: "Potato (Mashed)", calories: 237, protein: 4, carbs: 35, serving: "1 cup (210g)" },
+            { name: "French Fries", calories: 365, protein: 3.8, carbs: 48, serving: "1 medium (117g)" },
+            { name: "Tortilla (Flour)", calories: 159, protein: 4.4, carbs: 27, serving: "1 large (49g)" },
+            { name: "Tortilla (Corn)", calories: 52, protein: 1.4, carbs: 11, serving: "1 medium (26g)" },
+            { name: "Pita Bread", calories: 165, protein: 5.5, carbs: 33, serving: "1 large (60g)" },
+            { name: "Naan Bread", calories: 262, protein: 9, carbs: 45, serving: "1 piece (90g)" },
+            
+            // Nuts & Seeds
+            { name: "Almonds", calories: 164, protein: 6, carbs: 6, serving: "1 oz (28g)" },
+            { name: "Walnuts", calories: 185, protein: 4.3, carbs: 3.9, serving: "1 oz (28g)" },
+            { name: "Cashews", calories: 157, protein: 5.2, carbs: 8.6, serving: "1 oz (28g)" },
+            { name: "Peanuts", calories: 161, protein: 7.3, carbs: 4.6, serving: "1 oz (28g)" },
+            { name: "Pistachios", calories: 159, protein: 5.7, carbs: 7.7, serving: "1 oz (28g)" },
+            { name: "Pecans", calories: 196, protein: 2.6, carbs: 3.9, serving: "1 oz (28g)" },
+            { name: "Macadamia Nuts", calories: 204, protein: 2.2, carbs: 3.9, serving: "1 oz (28g)" },
+            { name: "Brazil Nuts", calories: 186, protein: 4.1, carbs: 3.3, serving: "1 oz (28g)" },
+            { name: "Hazelnuts", calories: 178, protein: 4.2, carbs: 4.7, serving: "1 oz (28g)" },
+            { name: "Sunflower Seeds", calories: 165, protein: 5.5, carbs: 6.8, serving: "1 oz (28g)" },
+            { name: "Pumpkin Seeds", calories: 151, protein: 7, carbs: 5, serving: "1 oz (28g)" },
+            { name: "Chia Seeds", calories: 138, protein: 4.7, carbs: 12, serving: "1 oz (28g)" },
+            { name: "Flax Seeds", calories: 150, protein: 5.1, carbs: 8.1, serving: "1 oz (28g)" },
+            { name: "Peanut Butter", calories: 188, protein: 8, carbs: 7, serving: "2 tbsp (32g)" },
+            { name: "Almond Butter", calories: 196, protein: 6.7, carbs: 6, serving: "2 tbsp (32g)" },
+            
+            // Fats & Oils
+            { name: "Avocado", calories: 234, protein: 2.9, carbs: 12, serving: "1 medium (201g)" },
+            { name: "Olive Oil", calories: 119, protein: 0, carbs: 0, serving: "1 tbsp (14g)" },
+            { name: "Coconut Oil", calories: 121, protein: 0, carbs: 0, serving: "1 tbsp (14g)" },
+            { name: "Butter", calories: 102, protein: 0.1, carbs: 0, serving: "1 tbsp (14g)" },
+            { name: "Ghee", calories: 112, protein: 0, carbs: 0, serving: "1 tbsp (13g)" },
+            
+            // Fast Food & Restaurant
+            { name: "Pizza (Cheese)", calories: 285, protein: 12, carbs: 36, serving: "1 slice (107g)" },
+            { name: "Pizza (Pepperoni)", calories: 313, protein: 13, carbs: 36, serving: "1 slice (113g)" },
+            { name: "Hamburger", calories: 354, protein: 20, carbs: 30, serving: "1 burger (150g)" },
+            { name: "Cheeseburger", calories: 407, protein: 23, carbs: 31, serving: "1 burger (165g)" },
+            { name: "Hot Dog", calories: 290, protein: 10, carbs: 24, serving: "1 hot dog (98g)" },
+            { name: "Fried Chicken", calories: 320, protein: 19, carbs: 16, serving: "1 piece (163g)" },
+            { name: "Chicken Nuggets", calories: 296, protein: 13, carbs: 18, serving: "6 pieces (106g)" },
+            { name: "Taco", calories: 226, protein: 9.4, carbs: 20, serving: "1 taco (102g)" },
+            { name: "Burrito", calories: 470, protein: 16, carbs: 57, serving: "1 burrito (198g)" },
+            { name: "Quesadilla", calories: 497, protein: 20, carbs: 39, serving: "1 quesadilla (180g)" },
+            { name: "Nachos", calories: 346, protein: 9.2, carbs: 36, serving: "1 serving (113g)" },
+            { name: "Sushi Roll", calories: 200, protein: 8.8, carbs: 27, serving: "6 pieces (156g)" },
+            { name: "Pad Thai", calories: 429, protein: 15, carbs: 61, serving: "1 cup (250g)" },
+            { name: "Fried Rice", calories: 238, protein: 5.5, carbs: 34, serving: "1 cup (198g)" },
+            { name: "Lo Mein", calories: 394, protein: 14, carbs: 51, serving: "1 cup (200g)" },
+            
+            // Snacks & Sweets
+            { name: "Chocolate Bar", calories: 235, protein: 3, carbs: 26, serving: "1 bar (43g)" },
+            { name: "Dark Chocolate", calories: 170, protein: 2.2, carbs: 13, serving: "1 oz (28g)" },
+            { name: "Milk Chocolate", calories: 152, protein: 2, carbs: 17, serving: "1 oz (28g)" },
+            { name: "Potato Chips", calories: 152, protein: 2, carbs: 15, serving: "1 oz (28g)" },
+            { name: "Tortilla Chips", calories: 137, protein: 2.2, carbs: 18, serving: "1 oz (28g)" },
+            { name: "Pretzels", calories: 108, protein: 2.6, carbs: 23, serving: "1 oz (28g)" },
+            { name: "Popcorn (Air-popped)", calories: 31, protein: 1, carbs: 6.2, serving: "1 cup (8g)" },
+            { name: "Popcorn (Buttered)", calories: 91, protein: 1.4, carbs: 9, serving: "1 cup (14g)" },
+            { name: "Granola Bar", calories: 134, protein: 2.5, carbs: 18, serving: "1 bar (28g)" },
+            { name: "Protein Bar", calories: 200, protein: 20, carbs: 22, serving: "1 bar (60g)" },
+            { name: "Cookie (Chocolate Chip)", calories: 78, protein: 0.9, carbs: 10, serving: "1 cookie (16g)" },
+            { name: "Brownie", calories: 112, protein: 1.5, carbs: 12, serving: "1 brownie (24g)" },
+            { name: "Ice Cream", calories: 207, protein: 3.5, carbs: 24, serving: "1/2 cup (66g)" },
+            { name: "Frozen Yogurt", calories: 114, protein: 2.9, carbs: 17, serving: "1/2 cup (72g)" },
+            { name: "Cake", calories: 239, protein: 2.3, carbs: 35, serving: "1 slice (64g)" },
+            { name: "Donut", calories: 269, protein: 3.6, carbs: 31, serving: "1 medium (64g)" },
+            { name: "Muffin", calories: 289, protein: 5.3, carbs: 51, serving: "1 medium (113g)" },
+            
+            // Beverages
+            { name: "Coffee (Black)", calories: 2, protein: 0.3, carbs: 0, serving: "1 cup (240ml)" },
+            { name: "Coffee (with Milk)", calories: 38, protein: 2, carbs: 3, serving: "1 cup (240ml)" },
+            { name: "Latte", calories: 103, protein: 6.2, carbs: 9, serving: "8 oz (240ml)" },
+            { name: "Cappuccino", calories: 74, protein: 4, carbs: 6, serving: "8 oz (240ml)" },
+            { name: "Tea (Unsweetened)", calories: 2, protein: 0, carbs: 0, serving: "1 cup (240ml)" },
+            { name: "Green Tea", calories: 0, protein: 0, carbs: 0, serving: "1 cup (240ml)" },
+            { name: "Orange Juice", calories: 112, protein: 1.7, carbs: 26, serving: "1 cup (248g)" },
+            { name: "Apple Juice", calories: 114, protein: 0.2, carbs: 28, serving: "1 cup (248g)" },
+            { name: "Soda (Regular)", calories: 140, protein: 0, carbs: 39, serving: "12 oz (355ml)" },
+            { name: "Soda (Diet)", calories: 0, protein: 0, carbs: 0, serving: "12 oz (355ml)" },
+            { name: "Energy Drink", calories: 110, protein: 0, carbs: 28, serving: "8 oz (240ml)" },
+            { name: "Sports Drink", calories: 80, protein: 0, carbs: 21, serving: "12 oz (355ml)" },
+            { name: "Beer", calories: 153, protein: 1.6, carbs: 13, serving: "12 oz (355ml)" },
+            { name: "Wine (Red)", calories: 125, protein: 0.1, carbs: 3.8, serving: "5 oz (147ml)" },
+            { name: "Wine (White)", calories: 121, protein: 0.1, carbs: 3.8, serving: "5 oz (147ml)" },
+            { name: "Vodka", calories: 97, protein: 0, carbs: 0, serving: "1.5 oz (44ml)" },
+            { name: "Whiskey", calories: 105, protein: 0, carbs: 0, serving: "1.5 oz (44ml)" },
+            
+            // Condiments & Sauces
+            { name: "Ketchup", calories: 17, protein: 0.2, carbs: 4.5, serving: "1 tbsp (17g)" },
+            { name: "Mustard", calories: 9, protein: 0.6, carbs: 1, serving: "1 tbsp (15g)" },
+            { name: "Mayonnaise", calories: 94, protein: 0.1, carbs: 0.1, serving: "1 tbsp (13g)" },
+            { name: "Ranch Dressing", calories: 73, protein: 0.4, carbs: 1.4, serving: "1 tbsp (15g)" },
+            { name: "Italian Dressing", calories: 43, protein: 0.1, carbs: 1.5, serving: "1 tbsp (15g)" },
+            { name: "Soy Sauce", calories: 8, protein: 1.3, carbs: 0.8, serving: "1 tbsp (18g)" },
+            { name: "BBQ Sauce", calories: 29, protein: 0.3, carbs: 7, serving: "1 tbsp (17g)" },
+            { name: "Hot Sauce", calories: 1, protein: 0.1, carbs: 0.1, serving: "1 tsp (5g)" },
+            { name: "Honey", calories: 64, protein: 0.1, carbs: 17, serving: "1 tbsp (21g)" },
+            { name: "Maple Syrup", calories: 52, protein: 0, carbs: 13, serving: "1 tbsp (20g)" },
+            { name: "Jam", calories: 56, protein: 0.1, carbs: 14, serving: "1 tbsp (20g)" }
+        ];
+        
+        let dailyLog = [];
+        let nutritionHistory = [];
+        const DAILY_GOAL = 2000; // calories
+        let nutritionChart = null;
+        let userProfile = null;
+        let calculatedGoals = null;
+        let weightHistory = [];
+        
+        // Calculate BMR (Basal Metabolic Rate) using Mifflin-St Jeor Equation
+        function calculateBMR(weight, height, age, sex) {
+            if (sex === 'male') {
+                return (10 * weight) + (6.25 * height) - (5 * age) + 5;
+            } else {
+                return (10 * weight) + (6.25 * height) - (5 * age) - 161;
+            }
+        }
+        
+        // Calculate lean body mass if body fat is provided
+        function calculateLeanMass(weight, bodyFat) {
+            if (bodyFat) {
+                return weight * (1 - bodyFat / 100);
+            }
+            return null;
+        }
+        
+        // Calculate TDEE (Total Daily Energy Expenditure)
+        function calculateTDEE(bmr, activityLevel) {
+            return bmr * parseFloat(activityLevel);
+        }
+        
+        // Calculate macros based on goal
+        function calculateMacros(profile) {
+            const { weight, height, age, sex, bodyFat, activityLevel, goal } = profile;
+            
+            const bmr = calculateBMR(weight, height, age, sex);
+            const tdee = calculateTDEE(bmr, activityLevel);
+            
+            let calories, proteinMultiplier, carbMultiplier, fatMultiplier;
+            let description;
+            
+            // Calculate lean body mass for protein calculation
+            const leanMass = calculateLeanMass(weight, bodyFat);
+            const proteinBase = leanMass || weight * 0.85; // Estimate if body fat not provided
+            
+            switch(goal) {
+                case 'cut':
+                    // Weight loss: 15-20% deficit
+                    calories = Math.round(tdee * 0.8);
+                    proteinMultiplier = 2.2; // Higher protein to preserve muscle
+                    fatMultiplier = 0.25; // 25% of calories from fat
+                    description = "For fat loss while preserving muscle: moderate calorie deficit with high protein to maintain lean mass during your cut.";
+                    break;
+                    
+                case 'bulk':
+                    // Muscle gain: 10-15% surplus
+                    calories = Math.round(tdee * 1.12);
+                    proteinMultiplier = 2.0; // Adequate protein for muscle growth
+                    fatMultiplier = 0.30; // 30% of calories from fat
+                    description = "For muscle building: calorie surplus with adequate protein and carbs to fuel training and recovery.";
+                    break;
+                    
+                case 'maintain':
+                default:
+                    // Maintenance
+                    calories = Math.round(tdee);
+                    proteinMultiplier = 1.8;
+                    fatMultiplier = 0.28;
+                    description = "For weight maintenance: balanced macros to sustain your current physique and performance.";
+                    break;
+            }
+            
+            // Calculate protein (g) - based on lean body mass
+            const protein = Math.round(proteinBase * proteinMultiplier);
+            
+            // Calculate fat (g) - percentage of total calories
+            const fatCalories = calories * fatMultiplier;
+            const fat = Math.round(fatCalories / 9); // 9 calories per gram of fat
+            
+            // Calculate carbs (g) - remaining calories
+            const proteinCalories = protein * 4;
+            const carbCalories = calories - proteinCalories - fatCalories;
+            const carbs = Math.round(carbCalories / 4); // 4 calories per gram of carbs
+            
+            // Health safety checks
+            const healthWarnings = checkHealthSafety(calories, sex, tdee);
+            const proteinWarning = checkProteinSafety(protein, weight);
+            
+            const warnings = [...healthWarnings];
+            if (proteinWarning) warnings.push(proteinWarning);
+            
+            return {
+                calories,
+                protein,
+                carbs,
+                fat,
+                bmr: Math.round(bmr),
+                tdee: Math.round(tdee),
+                description,
+                warnings
+            };
+        }
+        
+        // Initialize Chart
+        function initializeChart() {
+            const ctx = document.getElementById('nutritionChart').getContext('2d');
+            
+            nutritionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Calories',
+                            data: [],
+                            borderColor: '#00ffa3',
+                            backgroundColor: 'rgba(0, 255, 163, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#00ffa3',
+                            pointBorderColor: '#0a0e1a',
+                            pointBorderWidth: 2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Protein (g)',
+                            data: [],
+                            borderColor: '#4ecdc4',
+                            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#4ecdc4',
+                            pointBorderColor: '#0a0e1a',
+                            pointBorderWidth: 2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Carbs (g)',
+                            data: [],
+                            borderColor: '#ff6b35',
+                            backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#ff6b35',
+                            pointBorderColor: '#0a0e1a',
+                            pointBorderWidth: 2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Weight (kg)',
+                            data: [],
+                            borderColor: '#9b59b6',
+                            backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.4,
+                            fill: false,
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#9b59b6',
+                            pointBorderColor: '#0a0e1a',
+                            pointBorderWidth: 2,
+                            yAxisID: 'y1',
+                            borderDash: [5, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#a8b2d1',
+                                padding: 15,
+                                font: {
+                                    family: 'Manrope',
+                                    size: 11,
+                                    weight: '600'
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(20, 24, 36, 0.95)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#a8b2d1',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y;
+                                    if (context.datasetIndex === 0) {
+                                        label += ' kcal';
+                                    } else if (context.datasetIndex === 3) {
+                                        label += ' kg';
+                                    } else {
+                                        label += 'g';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#6b7794',
+                                font: {
+                                    family: 'Manrope',
+                                    size: 10
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Nutrition',
+                                color: '#a8b2d1',
+                                font: {
+                                    family: 'Manrope',
+                                    size: 11,
+                                    weight: '600'
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: '#9b59b6',
+                                font: {
+                                    family: 'Manrope',
+                                    size: 10
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Weight (kg)',
+                                color: '#9b59b6',
+                                font: {
+                                    family: 'Manrope',
+                                    size: 11,
+                                    weight: '600'
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#6b7794',
+                                font: {
+                                    family: 'Manrope',
+                                    size: 10
+                                },
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        // Update chart with history data
+        function updateChart() {
+            if (!nutritionChart) {
+                initializeChart();
+            }
+            
+            // Get last 7 days of data, reverse so oldest is first
+            const chartData = [...nutritionHistory].slice(0, 7).reverse();
+            
+            const labels = chartData.map(day => {
+                const date = new Date(day.date);
+                const today = getTodayDate();
+                if (day.date === today) {
+                    return 'Today';
+                }
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            
+            const calories = chartData.map(day => day.calories);
+            const protein = chartData.map(day => day.protein);
+            const carbs = chartData.map(day => day.carbs);
+            
+            // Get weight data for the same dates
+            const weights = chartData.map(day => {
+                const weightEntry = weightHistory.find(w => w.date === day.date);
+                return weightEntry ? weightEntry.weight : null;
+            });
+            
+            nutritionChart.data.labels = labels;
+            nutritionChart.data.datasets[0].data = calories;
+            nutritionChart.data.datasets[1].data = protein;
+            nutritionChart.data.datasets[2].data = carbs;
+            nutritionChart.data.datasets[3].data = weights;
+            
+            nutritionChart.update('active');
+        }
+        
+        // Get today's date in YYYY-MM-DD format
+        function getTodayDate() {
+            const now = new Date();
+            return now.toISOString().split('T')[0];
+        }
+        
+        // Check if date has changed and reset if needed
+        function checkAndResetIfNewDay() {
+            const today = getTodayDate();
+            const lastCheckDate = localStorage.getItem(LAST_CHECK_DATE_KEY);
+            
+            if (lastCheckDate && lastCheckDate !== today) {
+                // New day detected! Archive yesterday's data and reset
+                console.log(`📅 New day detected! Moving from ${lastCheckDate} to ${today}`);
+                
+                // Save current log to history if it has entries
+                if (dailyLog.length > 0) {
+                    updateHistory();
+                }
+                
+                // Clear today's log
+                dailyLog = [];
+                saveToStorage();
+                
+                // Update display
+                updateDisplay();
+                
+                alert(`🌅 Good morning! Your food log has been reset for ${today}.`);
+            }
+            
+            // Update last check date
+            localStorage.setItem(LAST_CHECK_DATE_KEY, today);
+        }
+        
+        // Fasting timer
+        function updateFastingTimer() {
+            const statusDiv = document.getElementById('fastingStatus');
+            const timerDiv = document.getElementById('fastingTimeLeft');
+            
+            if (!userProfile || !userProfile.fastingStart || !userProfile.fastingEnd) {
+                if (statusDiv) statusDiv.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const now = new Date();
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                
+                const [startH, startM] = userProfile.fastingStart.split(':').map(Number);
+                const [endH, endM] = userProfile.fastingEnd.split(':').map(Number);
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
+                
+                const isInWindow = (currentTime >= startMinutes && currentTime < endMinutes);
+                
+                if (statusDiv) statusDiv.style.display = 'block';
+                
+                if (isInWindow) {
+                    const minutesLeft = endMinutes - currentTime;
+                    const hours = Math.floor(minutesLeft / 60);
+                    const mins = minutesLeft % 60;
+                    if (timerDiv) {
+                        timerDiv.textContent = `✅ Eating window: ${hours}h ${mins}m remaining`;
+                        timerDiv.style.color = 'var(--accent-green)';
+                    }
+                } else {
+                    const minutesUntilStart = startMinutes > currentTime ? 
+                        (startMinutes - currentTime) : 
+                        (1440 - currentTime + startMinutes);
+                    const hours = Math.floor(minutesUntilStart / 60);
+                    const mins = minutesUntilStart % 60;
+                    if (timerDiv) {
+                        timerDiv.textContent = `🚫 Fasting: ${hours}h ${mins}m until eating window`;
+                        timerDiv.style.color = 'var(--accent-orange)';
+                    }
+                }
+            } catch (error) {
+                console.log('Fasting timer error:', error);
+                if (statusDiv) statusDiv.style.display = 'none';
+            }
+        }
+        
+        // Load data from storage on startup
+        async function loadFromStorage() {
+            try {
+                // Load today's log
+                const logData = localStorage.getItem(STORAGE_KEY);
+                if (logData) {
+                    const stored = JSON.parse(logData);
+                    // Check if it's from today
+                    if (stored.date === getTodayDate()) {
+                        dailyLog = stored.entries || [];
+                    }
+                }
+                
+                // Load history
+                const historyData = localStorage.getItem(HISTORY_KEY);
+                if (historyData) {
+                    nutritionHistory = JSON.parse(historyData);
+                }
+                
+                // Load weight history
+                const weightData = localStorage.getItem(WEIGHT_HISTORY_KEY);
+                if (weightData) {
+                    weightHistory = JSON.parse(weightData);
+                }
+                
+                // Load profile
+                const profileData = localStorage.getItem(PROFILE_KEY);
+                if (profileData) {
+                    userProfile = JSON.parse(profileData);
+                    loadProfileForm();
+                    calculatedGoals = calculateMacros(userProfile);
+                    displayResults();
+                }
+            } catch (error) {
+                console.log('No existing data found, starting fresh');
+            }
+            
+            updateDisplay();
+            updateHistoryDisplay();
+            initializeChart();
+            updateChart();
+            
+            // Check for backup reminder
+            checkBackupReminder();
+        }
+        
+        // Load profile data into form
+        function loadProfileForm() {
+            if (userProfile) {
+                document.getElementById('age').value = userProfile.age || '';
+                document.getElementById('sex').value = userProfile.sex || '';
+                document.getElementById('height').value = userProfile.height || '';
+                document.getElementById('weight').value = userProfile.weight || '';
+                document.getElementById('bodyFat').value = userProfile.bodyFat || '';
+                document.getElementById('activityLevel').value = userProfile.activityLevel || '1.55';
+                document.getElementById('goal').value = userProfile.goal || 'maintain';
+                
+                // Load fasting window
+                const fastingStartEl = document.getElementById('fastingStart');
+                const fastingEndEl = document.getElementById('fastingEnd');
+                if (fastingStartEl) fastingStartEl.value = userProfile.fastingStart || '';
+                if (fastingEndEl) fastingEndEl.value = userProfile.fastingEnd || '';
+            }
+        }
+        
+        // Display calculation results
+        function displayResults() {
+            if (calculatedGoals) {
+                document.getElementById('targetCalories').textContent = calculatedGoals.calories + ' kcal';
+                document.getElementById('targetProtein').textContent = calculatedGoals.protein + 'g';
+                document.getElementById('targetCarbs').textContent = calculatedGoals.carbs + 'g';
+                document.getElementById('targetFats').textContent = calculatedGoals.fat + 'g';
+                document.getElementById('goalDescription').textContent = calculatedGoals.description;
+                
+                // Display health warnings if any
+                if (calculatedGoals.warnings && calculatedGoals.warnings.length > 0) {
+                    const warningsHtml = calculatedGoals.warnings.map(w => 
+                        `<div style="background: rgba(255, 107, 53, 0.1); border-left: 3px solid var(--accent-orange); padding: 12px; margin-top: 12px; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">${w}</div>`
+                    ).join('');
+                    
+                    document.getElementById('goalDescription').innerHTML = 
+                        calculatedGoals.description + warningsHtml + 
+                        '<div style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted); font-style: italic;">⚕️ This app is not a substitute for professional medical advice. Consult a healthcare provider or registered dietitian before starting any diet program.</div>';
+                } else {
+                    document.getElementById('goalDescription').innerHTML = 
+                        calculatedGoals.description + 
+                        '<div style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted); font-style: italic;">⚕️ This app is not a substitute for professional medical advice. Consult a healthcare provider or registered dietitian before starting any diet program.</div>';
+                }
+                
+                document.getElementById('resultsSection').style.display = 'block';
+            }
+        }
+        
+        
+        // Save current log to storage
+        function saveToStorage() {
+            try {
+                const dataToSave = {
+                    date: getTodayDate(),
+                    entries: dailyLog,
+                    timestamp: new Date().toISOString()
+                };
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+                
+                // Update history
+                updateHistory();
+            } catch (error) {
+                console.error('Error saving to storage:', error);
+            }
+        }
+        
+        // Update nutrition history
+        function updateHistory() {
+            try {
+                const today = getTodayDate();
+                const totalCalories = dailyLog.reduce((sum, item) => sum + item.calories, 0);
+                const totalProtein = dailyLog.reduce((sum, item) => sum + item.protein, 0);
+                const totalCarbs = dailyLog.reduce((sum, item) => sum + item.carbs, 0);
+                
+                // Remove today's entry if it exists
+                nutritionHistory = nutritionHistory.filter(entry => entry.date !== today);
+                
+                // Add today's summary
+                if (dailyLog.length > 0) {
+                    nutritionHistory.unshift({
+                        date: today,
+                        calories: totalCalories,
+                        protein: Math.round(totalProtein),
+                        carbs: Math.round(totalCarbs),
+                        mealCount: dailyLog.length
+                    });
+                    
+                    // Keep only last 30 days
+                    nutritionHistory = nutritionHistory.slice(0, 30);
+                }
+                
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(nutritionHistory));
+                updateHistoryDisplay();
+                updateChart();
+            } catch (error) {
+                console.error('Error updating history:', error);
+            }
+        }
+        
+        // Tab switching
+        function initializeEventListeners() {
+            // Tab switching
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            if (tabButtons.length > 0) {
+                tabButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.input-panel').forEach(p => p.classList.remove('active'));
+                        
+                        btn.classList.add('active');
+                        const tabName = btn.getAttribute('data-tab');
+                        const panel = document.getElementById(tabName + 'Panel');
+                        if (panel) panel.classList.add('active');
+                        
+                        // Auto-populate date/time when manual tab opens
+                        if (tabName === 'manual') {
+                            const now = new Date();
+                            const dateInput = document.getElementById('manualDate');
+                            const timeInput = document.getElementById('manualTime');
+                            
+                            if (dateInput && !dateInput.value) {
+                                dateInput.value = now.toISOString().split('T')[0];
+                            }
+                            if (timeInput && !timeInput.value) {
+                                const hours = String(now.getHours()).padStart(2, '0');
+                                const minutes = String(now.getMinutes()).padStart(2, '0');
+                                timeInput.value = `${hours}:${minutes}`;
+                            }
+                        }
+                    });
+                });
+            }
+        }
+        
+        // Search functionality
+        function initializeSearchListeners() {
+            const searchInput = document.getElementById('foodSearch');
+            const suggestionsDiv = document.getElementById('suggestions');
+            
+            if (!searchInput || !suggestionsDiv) {
+                console.log('Search elements not found');
+                return;
+            }
+            
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                if (query.length < 2) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                const matches = foodDatabase.filter(food => 
+                    food.name.toLowerCase().includes(query)
+                ).slice(0, 5);
+                
+                if (matches.length > 0) {
+                    suggestionsDiv.innerHTML = matches.map(food => `
+                        <div class="suggestion-item" data-food='${JSON.stringify(food)}'>
+                            <div class="suggestion-name">${food.name}</div>
+                            <div class="suggestion-cal">${food.calories} kcal · ${food.serving}</div>
+                        </div>
+                    `).join('');
+                    suggestionsDiv.style.display = 'block';
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+            
+            suggestionsDiv.addEventListener('click', (e) => {
+                const item = e.target.closest('.suggestion-item');
+                if (item) {
+                    const food = JSON.parse(item.getAttribute('data-food'));
+                    
+                    // Show serving size adjustment modal
+                    showServingSizeModal(food);
+                    
+                    searchInput.value = '';
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+        }
+        
+        // Show serving size adjustment modal
+        function showServingSizeModal(food) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                padding: 20px;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 24px;
+                max-width: 500px;
+                width: 100%;
+                max-height: 90vh;
+                overflow-y: auto;
+            `;
+            
+            // Extract per 100g values from serving size
+            const servingMatch = food.serving.match(/(\d+\.?\d*)\s*g/);
+            const originalGrams = servingMatch ? parseFloat(servingMatch[1]) : 100;
+            const caloriesPer100 = Math.round((food.calories / originalGrams) * 100);
+            const proteinPer100 = parseFloat(((food.protein / originalGrams) * 100).toFixed(1));
+            const carbsPer100 = parseFloat(((food.carbs / originalGrams) * 100).toFixed(1));
+            
+            modalContent.innerHTML = `
+                <h3 style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 16px; font-weight: 600;">
+                    ${food.name}
+                </h3>
+                
+                <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border);">
+                    <h4 style="color: var(--accent-blue); font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;">
+                        📊 Per 100g
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+                        <div>
+                            <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent-green);">${caloriesPer100}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">kcal</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent-blue);">${proteinPer100}g</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">protein</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent-orange);">${carbsPer100}g</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">carbs</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border);">
+                    <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); font-weight: 600; margin-bottom: 8px;">
+                        🍽️ Your Serving Size (grams)
+                    </label>
+                    <input 
+                        type="number" 
+                        id="modalServingGrams" 
+                        value="${originalGrams}"
+                        min="1" 
+                        step="0.1"
+                        style="width: 100%; padding: 14px 16px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 1rem; font-family: 'Manrope', sans-serif;"
+                    >
+                </div>
+                
+                <div id="modalPreview" style="background: linear-gradient(135deg, rgba(0, 255, 163, 0.1), rgba(78, 205, 196, 0.1)); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--accent-green);">
+                    <h4 style="color: var(--accent-green); font-size: 0.95rem; margin-bottom: 12px; font-weight: 600;">
+                        ✨ Your Portion
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);" id="modalPreviewCalories">${food.calories}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">kcal</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-blue);" id="modalPreviewProtein">${food.protein}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">protein (g)</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-orange);" id="modalPreviewCarbs">${food.carbs}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">carbs (g)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px;">
+                    <button id="modalAddBtn" style="flex: 1; padding: 14px; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); border: none; border-radius: 8px; color: var(--bg-primary); font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Manrope', sans-serif;">
+                        Add to Log
+                    </button>
+                    <button id="modalCancelBtn" style="flex: 1; padding: 14px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Manrope', sans-serif;">
+                        Cancel
+                    </button>
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Real-time calculation
+            const servingInput = modalContent.querySelector('#modalServingGrams');
+            const updateModalPreview = () => {
+                const grams = parseFloat(servingInput.value) || 0;
+                if (grams > 0) {
+                    const multiplier = grams / 100;
+                    const calories = Math.round(caloriesPer100 * multiplier);
+                    const protein = (proteinPer100 * multiplier).toFixed(1);
+                    const carbs = (carbsPer100 * multiplier).toFixed(1);
+                    
+                    modalContent.querySelector('#modalPreviewCalories').textContent = calories;
+                    modalContent.querySelector('#modalPreviewProtein').textContent = protein;
+                    modalContent.querySelector('#modalPreviewCarbs').textContent = carbs;
+                }
+            };
+            
+            servingInput.addEventListener('input', updateModalPreview);
+            
+            // Add button
+            modalContent.querySelector('#modalAddBtn').addEventListener('click', () => {
+                const grams = parseFloat(servingInput.value);
+                if (grams > 0) {
+                    const multiplier = grams / 100;
+                    const adjustedFood = {
+                        name: food.name,
+                        serving: `${grams}g`,
+                        calories: Math.round(caloriesPer100 * multiplier),
+                        protein: parseFloat((proteinPer100 * multiplier).toFixed(1)),
+                        carbs: parseFloat((carbsPer100 * multiplier).toFixed(1))
+                    };
+                    
+                    addFoodToLog(adjustedFood);
+                    document.body.removeChild(modal);
+                    alert(`✅ "${food.name}" (${grams}g) added to your log!`);
+                } else {
+                    alert('❌ Please enter a valid serving size');
+                }
+            });
+            
+            // Cancel button
+            modalContent.querySelector('#modalCancelBtn').addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+        }
+        
+        
+        function addFoodToLog(food) {
+            // Validate food item
+            const validationErrors = validateFoodItem(food);
+            if (validationErrors.length > 0) {
+                alert('❌ Invalid food data:\n\n' + validationErrors.join('\n'));
+                return;
+            }
+            
+            // Sanitize text inputs
+            const logEntry = {
+                name: sanitizeText(food.name),
+                serving: sanitizeText(food.serving || 'N/A'),
+                calories: Math.round(food.calories),
+                protein: parseFloat(food.protein.toFixed(1)),
+                carbs: parseFloat(food.carbs.toFixed(1)),
+                timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            };
+            
+            dailyLog.push(logEntry);
+            updateDisplay();
+            saveToStorage();
+        }
+        
+        function updateDisplay() {
+            const totalCalories = dailyLog.reduce((sum, item) => sum + item.calories, 0);
+            const totalProtein = dailyLog.reduce((sum, item) => sum + item.protein, 0);
+            const totalCarbs = dailyLog.reduce((sum, item) => sum + item.carbs, 0);
+            
+            document.getElementById('totalCalories').textContent = totalCalories;
+            document.getElementById('totalProtein').textContent = Math.round(totalProtein);
+            document.getElementById('totalCarbs').textContent = Math.round(totalCarbs);
+            
+            // Use calculated goals if available, otherwise use default
+            const calorieGoal = calculatedGoals ? calculatedGoals.calories : DAILY_GOAL;
+            const progress = Math.min((totalCalories / calorieGoal) * 100, 100);
+            document.getElementById('calorieProgress').style.width = progress + '%';
+            
+            const foodListDiv = document.getElementById('foodList');
+            
+            if (dailyLog.length === 0) {
+                foodListDiv.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🍽️</div>
+                        <div>No meals logged yet today</div>
+                    </div>
+                `;
+            } else {
+                foodListDiv.innerHTML = dailyLog.map((item, index) => `
+                    <div class="food-item">
+                        <div class="food-info">
+                            <h3>${item.name}</h3>
+                            <div class="food-meta">${item.serving} · ${item.timestamp}</div>
+                        </div>
+                        <div class="food-calories">
+                            <div class="cal-value">${item.calories}</div>
+                            <div class="cal-label">kcal</div>
+                        </div>
+                        <button class="delete-btn" onclick="removeFood(${index})">×</button>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function removeFood(index) {
+            const food = dailyLog[index];
+            if (confirm(`Delete "${food.name}" (${food.calories} kcal)?`)) {
+                dailyLog.splice(index, 1);
+                updateDisplay();
+                saveToStorage();
+            }
+        }
+        
+        function updateHistoryDisplay() {
+            const historyContent = document.getElementById('historyContent');
+            
+            if (nutritionHistory.length === 0) {
+                historyContent.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div>No history available yet</div>
+                        <div style="font-size: 0.85rem; margin-top: 8px;">Start logging meals to see your history</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const calorieGoal = calculatedGoals ? calculatedGoals.calories : DAILY_GOAL;
+            
+            historyContent.innerHTML = nutritionHistory.map(day => {
+                const date = new Date(day.date);
+                const isToday = day.date === getTodayDate();
+                const dayLabel = isToday ? 'Today' : date.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+                
+                const caloriePercent = Math.round((day.calories / calorieGoal) * 100);
+                
+                return `
+                    <div class="history-card">
+                        <div class="history-date">${dayLabel}</div>
+                        <div class="history-stats">
+                            <div class="history-stat">
+                                <div class="history-stat-value">${day.calories}</div>
+                                <div class="history-stat-label">Calories</div>
+                            </div>
+                            <div class="history-stat">
+                                <div class="history-stat-value">${day.protein}g</div>
+                                <div class="history-stat-label">Protein</div>
+                            </div>
+                            <div class="history-stat">
+                                <div class="history-stat-value">${day.carbs}g</div>
+                                <div class="history-stat-label">Carbs</div>
+                            </div>
+                        </div>
+                        <div class="history-meals">
+                            ${day.mealCount} meal${day.mealCount !== 1 ? 's' : ''} logged · ${caloriePercent}% of daily goal
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Close suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            const suggestionsDiv = document.getElementById('suggestions');
+            if (suggestionsDiv && !e.target.closest('.search-box')) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+        
+        // Log weight button handler
+        const logWeightBtn = document.getElementById('logWeightBtn');
+        if (logWeightBtn) {
+            logWeightBtn.addEventListener('click', () => {
+            try {
+                const weightInput = document.getElementById('currentWeight').value;
+                
+                if (!weightInput) {
+                    alert('❌ Please enter your current weight');
+                    return;
+                }
+                
+                const weight = validateNumber(weightInput, VALIDATION.weight.min, VALIDATION.weight.max, 'Weight');
+                const today = getTodayDate();
+                
+                // Remove today's entry if exists
+                weightHistory = weightHistory.filter(entry => entry.date !== today);
+                
+                // Add new entry
+                weightHistory.unshift({
+                    date: today,
+                    weight: weight,
+                    timestamp: new Date().toISOString()
+                });
+                
+                // Keep only last 30 days
+                weightHistory = weightHistory.slice(0, 30);
+                
+                // Save to storage
+                localStorage.setItem(WEIGHT_HISTORY_KEY, JSON.stringify(weightHistory));
+                
+                // Update chart
+                updateChart();
+                
+                // Clear input
+                document.getElementById('currentWeight').value = '';
+                
+                alert(`✅ Weight logged: ${weight} kg`);
+                
+            } catch (error) {
+                alert('❌ ' + error.message);
+            }
+        });
+        }
+        
+        // Manual entry button handler
+        const addManualBtn = document.getElementById('addManualBtn');
+        if (addManualBtn) {
+            addManualBtn.addEventListener('click', () => {
+                try {
+                    const name = document.getElementById('manualFoodName').value.trim();
+                    const caloriesPer100 = document.getElementById('manualCaloriesPer100').value;
+                    const proteinPer100 = document.getElementById('manualProteinPer100').value;
+                    const carbsPer100 = document.getElementById('manualCarbsPer100').value;
+                    const servingGrams = document.getElementById('manualServingGrams').value;
+                
+                // Validation
+                if (!name) {
+                    alert('❌ Please enter a food name');
+                    return;
+                }
+                
+                if (!caloriesPer100 || !proteinPer100 || !carbsPer100 || !servingGrams) {
+                    alert('❌ Please fill in all required fields');
+                    return;
+                }
+                
+                // Parse values
+                const calPer100 = parseFloat(caloriesPer100);
+                const protPer100 = parseFloat(proteinPer100);
+                const carbPer100 = parseFloat(carbsPer100);
+                const grams = parseFloat(servingGrams);
+                
+                // Calculate actual values based on serving size
+                const multiplier = grams / 100;
+                const actualCalories = Math.round(calPer100 * multiplier);
+                const actualProtein = parseFloat((protPer100 * multiplier).toFixed(1));
+                const actualCarbs = parseFloat((carbPer100 * multiplier).toFixed(1));
+                
+                // Create food object
+                const manualFood = {
+                    name: name,
+                    serving: `${grams}g`,
+                    calories: actualCalories,
+                    protein: actualProtein,
+                    carbs: actualCarbs
+                };
+                
+                // Add to log (this will validate the data)
+                addFoodToLog(manualFood);
+                
+                // Clear form
+                document.getElementById('manualFoodName').value = '';
+                document.getElementById('manualCaloriesPer100').value = '';
+                document.getElementById('manualProteinPer100').value = '';
+                document.getElementById('manualCarbsPer100').value = '';
+                document.getElementById('manualServingGrams').value = '';
+                document.getElementById('calculatedPreview').style.display = 'none';
+                
+                // Show success message
+                alert(`✅ "${name}" (${grams}g) added to your log!\n\n${actualCalories} kcal | ${actualProtein}g protein | ${actualCarbs}g carbs`);
+                
+            } catch (error) {
+                console.error('Manual entry error:', error);
+                // Error will be shown by addFoodToLog validation
+            }
+        });
+        }
+        
+        // Real-time calculation preview
+        function updateManualPreview() {
+            const caloriesPer100 = parseFloat(document.getElementById('manualCaloriesPer100').value) || 0;
+            const proteinPer100 = parseFloat(document.getElementById('manualProteinPer100').value) || 0;
+            const carbsPer100 = parseFloat(document.getElementById('manualCarbsPer100').value) || 0;
+            const servingGrams = parseFloat(document.getElementById('manualServingGrams').value) || 0;
+            
+            if (caloriesPer100 > 0 && servingGrams > 0) {
+                const multiplier = servingGrams / 100;
+                const calories = Math.round(caloriesPer100 * multiplier);
+                const protein = (proteinPer100 * multiplier).toFixed(1);
+                const carbs = (carbsPer100 * multiplier).toFixed(1);
+                
+                document.getElementById('previewCalories').textContent = calories;
+                document.getElementById('previewProtein').textContent = protein;
+                document.getElementById('previewCarbs').textContent = carbs;
+                document.getElementById('calculatedPreview').style.display = 'block';
+            } else {
+                document.getElementById('calculatedPreview').style.display = 'none';
+            }
+        }
+        
+        // Add event listeners for real-time calculation
+        const manualCaloriesPer100 = document.getElementById('manualCaloriesPer100');
+        const manualProteinPer100 = document.getElementById('manualProteinPer100');
+        const manualCarbsPer100 = document.getElementById('manualCarbsPer100');
+        const manualServingGrams = document.getElementById('manualServingGrams');
+        
+        if (manualCaloriesPer100) manualCaloriesPer100.addEventListener('input', updateManualPreview);
+        if (manualProteinPer100) manualProteinPer100.addEventListener('input', updateManualPreview);
+        if (manualCarbsPer100) manualCarbsPer100.addEventListener('input', updateManualPreview);
+        if (manualServingGrams) manualServingGrams.addEventListener('input', updateManualPreview);
+        
+        // Calculate button handler
+        const calculateBtn = document.getElementById('calculateBtn');
+        if (calculateBtn) {
+            calculateBtn.addEventListener('click', () => {
+            try {
+                // Get and validate inputs
+                const ageInput = document.getElementById('age').value;
+                const sex = document.getElementById('sex').value;
+                const heightInput = document.getElementById('height').value;
+                const weightInput = document.getElementById('weight').value;
+                const bodyFatInput = document.getElementById('bodyFat').value;
+                const activityLevel = document.getElementById('activityLevel').value;
+                const goal = document.getElementById('goal').value;
+                
+                // Validation
+                if (!sex) {
+                    alert('❌ Please select your sex');
+                    return;
+                }
+                
+                let age, height, weight, bodyFat = null;
+                
+                try {
+                    age = validateNumber(ageInput, VALIDATION.age.min, VALIDATION.age.max, 'Age');
+                } catch (e) {
+                    alert('❌ ' + e.message);
+                    return;
+                }
+                
+                try {
+                    height = validateNumber(heightInput, VALIDATION.height.min, VALIDATION.height.max, 'Height');
+                } catch (e) {
+                    alert('❌ ' + e.message);
+                    return;
+                }
+                
+                try {
+                    weight = validateNumber(weightInput, VALIDATION.weight.min, VALIDATION.weight.max, 'Weight');
+                } catch (e) {
+                    alert('❌ ' + e.message);
+                    return;
+                }
+                
+                if (bodyFatInput) {
+                    try {
+                        bodyFat = validateNumber(bodyFatInput, VALIDATION.bodyFat.min, VALIDATION.bodyFat.max, 'Body Fat %');
+                    } catch (e) {
+                        alert('❌ ' + e.message);
+                        return;
+                    }
+                }
+                
+                // Save profile
+                userProfile = {
+                    age,
+                    sex,
+                    height,
+                    weight,
+                    bodyFat,
+                    activityLevel,
+                    goal,
+                    fastingStart: document.getElementById('fastingStart').value || null,
+                    fastingEnd: document.getElementById('fastingEnd').value || null
+                };
+                
+                try {
+                    localStorage.setItem(PROFILE_KEY, JSON.stringify(userProfile));
+                } catch (error) {
+                    console.error('Error saving profile:', error);
+                    alert('⚠️ Error saving profile. Your browser storage may be full.');
+                    return;
+                }
+                
+                // Calculate goals
+                calculatedGoals = calculateMacros(userProfile);
+                displayResults();
+                
+                // Update the display with new goals
+                updateDisplay();
+                
+                // Show success message if there are warnings
+                if (calculatedGoals.warnings && calculatedGoals.warnings.length > 0) {
+                    alert('✅ Goals calculated!\n\n⚠️ Please review the health warnings below your results.');
+                }
+                
+            } catch (error) {
+                console.error('Calculation error:', error);
+                alert('❌ An error occurred during calculation. Please check your inputs.');
+            }
+        });
+        }
+        
+        // Export data functionality
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+            const exportData = {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                profile: userProfile,
+                todayLog: {
+                    date: getTodayDate(),
+                    entries: dailyLog
+                },
+                history: nutritionHistory,
+                weightHistory: weightHistory
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `nutrisnap-backup-${getTodayDate()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            // Update last export timestamp
+            localStorage.setItem(LAST_EXPORT_KEY, Date.now().toString());
+        });
+        }
+        
+        // Export to Excel functionality
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        if (exportExcelBtn) {
+            exportExcelBtn.addEventListener('click', () => {
+            try {
+                const wb = XLSX.utils.book_new();
+                
+                // Sheet 1: Daily Summary
+                const summaryData = [
+                    ['NutriSnap Nutrition Report'],
+                    ['Generated:', new Date().toLocaleString()],
+                    [],
+                    ['Date', 'Calories', 'Protein (g)', 'Carbs (g)', 'Meals', '% of Goal']
+                ];
+                
+                const calorieGoal = calculatedGoals ? calculatedGoals.calories : 2000;
+                
+                nutritionHistory.forEach(day => {
+                    const percent = Math.round((day.calories / calorieGoal) * 100);
+                    summaryData.push([
+                        day.date,
+                        day.calories,
+                        day.protein,
+                        day.carbs,
+                        day.mealCount,
+                        percent + '%'
+                    ]);
+                });
+                
+                // Add totals row
+                const totalCals = nutritionHistory.reduce((sum, day) => sum + day.calories, 0);
+                const totalProtein = nutritionHistory.reduce((sum, day) => sum + day.protein, 0);
+                const totalCarbs = nutritionHistory.reduce((sum, day) => sum + day.carbs, 0);
+                const avgCals = nutritionHistory.length > 0 ? Math.round(totalCals / nutritionHistory.length) : 0;
+                
+                summaryData.push([]);
+                summaryData.push(['Averages:', avgCals, Math.round(totalProtein / nutritionHistory.length), Math.round(totalCarbs / nutritionHistory.length)]);
+                
+                const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+                
+                // Set column widths
+                ws1['!cols'] = [
+                    { wch: 12 },
+                    { wch: 10 },
+                    { wch: 12 },
+                    { wch: 12 },
+                    { wch: 8 },
+                    { wch: 12 }
+                ];
+                
+                XLSX.utils.book_append_sheet(wb, ws1, "Daily Summary");
+                
+                // Sheet 2: Today's Meals
+                if (dailyLog.length > 0) {
+                    const mealsData = [
+                        ['Today\'s Meals - ' + getTodayDate()],
+                        [],
+                        ['Time', 'Food', 'Serving', 'Calories', 'Protein (g)', 'Carbs (g)']
+                    ];
+                    
+                    dailyLog.forEach(meal => {
+                        mealsData.push([
+                            meal.timestamp,
+                            meal.name,
+                            meal.serving,
+                            meal.calories,
+                            meal.protein,
+                            meal.carbs
+                        ]);
+                    });
+                    
+                    // Add totals
+                    const todayTotals = {
+                        calories: dailyLog.reduce((sum, m) => sum + m.calories, 0),
+                        protein: dailyLog.reduce((sum, m) => sum + m.protein, 0),
+                        carbs: dailyLog.reduce((sum, m) => sum + m.carbs, 0)
+                    };
+                    
+                    mealsData.push([]);
+                    mealsData.push(['', '', 'TOTALS:', todayTotals.calories, Math.round(todayTotals.protein), Math.round(todayTotals.carbs)]);
+                    
+                    const ws2 = XLSX.utils.aoa_to_sheet(mealsData);
+                    ws2['!cols'] = [
+                        { wch: 10 },
+                        { wch: 25 },
+                        { wch: 20 },
+                        { wch: 10 },
+                        { wch: 12 },
+                        { wch: 12 }
+                    ];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws2, "Today's Meals");
+                }
+                
+                // Sheet 3: Profile & Goals
+                if (userProfile && calculatedGoals) {
+                    const profileData = [
+                        ['Your Profile & Goals'],
+                        [],
+                        ['Profile Information'],
+                        ['Age', userProfile.age],
+                        ['Sex', userProfile.sex],
+                        ['Height (cm)', userProfile.height],
+                        ['Weight (kg)', userProfile.weight],
+                        ['Body Fat %', userProfile.bodyFat || 'Not provided'],
+                        ['Activity Level', userProfile.activityLevel],
+                        ['Goal', userProfile.goal.toUpperCase()],
+                        [],
+                        ['Calculated Daily Targets'],
+                        ['Calories', calculatedGoals.calories + ' kcal'],
+                        ['Protein', calculatedGoals.protein + 'g'],
+                        ['Carbs', calculatedGoals.carbs + 'g'],
+                        ['Fats', calculatedGoals.fat + 'g'],
+                        [],
+                        ['Metabolic Info'],
+                        ['BMR', calculatedGoals.bmr + ' kcal'],
+                        ['TDEE', calculatedGoals.tdee + ' kcal']
+                    ];
+                    
+                    const ws3 = XLSX.utils.aoa_to_sheet(profileData);
+                    ws3['!cols'] = [{ wch: 25 }, { wch: 20 }];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws3, "Profile & Goals");
+                }
+                
+                // Sheet 4: Weight History
+                if (weightHistory.length > 0) {
+                    const weightData = [
+                        ['Weight History'],
+                        [],
+                        ['Date', 'Weight (kg)', 'Change (kg)']
+                    ];
+                    
+                    let previousWeight = null;
+                    [...weightHistory].reverse().forEach((entry, index) => {
+                        const change = previousWeight ? (entry.weight - previousWeight).toFixed(1) : '-';
+                        weightData.push([
+                            entry.date,
+                            entry.weight,
+                            change
+                        ]);
+                        previousWeight = entry.weight;
+                    });
+                    
+                    // Add summary
+                    if (weightHistory.length > 1) {
+                        const firstWeight = weightHistory[weightHistory.length - 1].weight;
+                        const lastWeight = weightHistory[0].weight;
+                        const totalChange = (lastWeight - firstWeight).toFixed(1);
+                        
+                        weightData.push([]);
+                        weightData.push(['Total Change:', totalChange + ' kg']);
+                    }
+                    
+                    const ws4 = XLSX.utils.aoa_to_sheet(weightData);
+                    ws4['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }];
+                    
+                    XLSX.utils.book_append_sheet(wb, ws4, "Weight History");
+                }
+                
+                // Generate Excel file
+                XLSX.writeFile(wb, `NutriSnap-Report-${getTodayDate()}.xlsx`);
+                
+                // Update last export timestamp
+                localStorage.setItem(LAST_EXPORT_KEY, Date.now().toString());
+                
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                alert('Error creating Excel file. Please try again.');
+            }
+        });
+        }
+        
+        // Import data functionality
+        const importBtn = document.getElementById('importBtn');
+        const importFile = document.getElementById('importFile');
+        
+        if (importBtn && importFile) {
+            importBtn.addEventListener('click', () => {
+                importFile.click();
+            });
+            
+            importFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Validate file type
+            if (!file.name.endsWith('.json')) {
+                alert('❌ Please upload a JSON file only');
+                e.target.value = '';
+                return;
+            }
+            
+            // Validate file size (max 5MB for JSON)
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            if (file.size > maxSize) {
+                alert('❌ File is too large. Maximum size is 5MB.');
+                e.target.value = '';
+                return;
+            }
+            
+            try {
+                const text = await file.text();
+                const importData = JSON.parse(text);
+                
+                // Validate data structure
+                if (!importData.version || !importData.exportedAt) {
+                    alert('❌ Invalid backup file format. Please use a file exported from NutriSnap.');
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Confirm import
+                const confirmMsg = `Import data from ${new Date(importData.exportedAt).toLocaleString()}?\n\n⚠️ This will REPLACE your current data.\n\nMake sure you've exported your current data first!`;
+                if (!confirm(confirmMsg)) {
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Import profile
+                if (importData.profile) {
+                    userProfile = importData.profile;
+                    localStorage.setItem(PROFILE_KEY, JSON.stringify(userProfile));
+                    loadProfileForm();
+                    calculatedGoals = calculateMacros(userProfile);
+                    displayResults();
+                }
+                
+                // Import today's log if it matches today's date
+                if (importData.todayLog && importData.todayLog.date === getTodayDate()) {
+                    dailyLog = importData.todayLog.entries || [];
+                    saveToStorage();
+                }
+                
+                // Import history
+                if (importData.history) {
+                    nutritionHistory = importData.history;
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(nutritionHistory));
+                }
+                
+                // Import weight history
+                if (importData.weightHistory) {
+                    weightHistory = importData.weightHistory;
+                    localStorage.setItem(WEIGHT_HISTORY_KEY, JSON.stringify(weightHistory));
+                }
+                
+                // Update all displays
+                updateDisplay();
+                updateHistoryDisplay();
+                updateChart();
+                
+                alert('✅ Data imported successfully!');
+                e.target.value = '';
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('❌ Error importing data. Please check the file format and try again.');
+                e.target.value = '';
+            }
+        });
+        }
+        
+        // Clear all data functionality
+        const clearBtn = document.getElementById('clearBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+            const confirmMsg = '⚠️ DELETE ALL DATA?\n\n' +
+                'This will permanently delete:\n' +
+                '• Your profile and goals\n' +
+                '• Today\'s meal log\n' +
+                '• All 30 days of history\n\n' +
+                '❌ THIS CANNOT BE UNDONE!\n\n' +
+                'Export your data first if you want to keep it.\n\n' +
+                'Type "DELETE" to confirm:';
+            
+            const userInput = prompt(confirmMsg);
+            
+            if (userInput === 'DELETE') {
+                try {
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(HISTORY_KEY);
+                    localStorage.removeItem(PROFILE_KEY);
+                    localStorage.removeItem(LAST_EXPORT_KEY);
+                    localStorage.removeItem(WEIGHT_HISTORY_KEY);
+                    dailyLog = [];
+                    nutritionHistory = [];
+                    userProfile = null;
+                    calculatedGoals = null;
+                    weightHistory = [];
+                    updateDisplay();
+                    updateHistoryDisplay();
+                    updateChart();
+                    document.getElementById('resultsSection').style.display = 'none';
+                    
+                    // Reset form
+                    document.getElementById('age').value = '';
+                    document.getElementById('sex').value = '';
+                    document.getElementById('height').value = '';
+                    document.getElementById('weight').value = '';
+                    document.getElementById('bodyFat').value = '';
+                    document.getElementById('activityLevel').value = '1.55';
+                    document.getElementById('goal').value = 'maintain';
+                    
+                    alert('✅ All data has been cleared.');
+                } catch (error) {
+                    console.error('Error clearing data:', error);
+                    alert('❌ Error clearing data. Please try again.');
+                }
+            } else if (userInput !== null) {
+                alert('❌ Incorrect confirmation. Data was NOT deleted.');
+            }
+        });
+        }
+        
+        // Initialize display and load data
+        loadFromStorage();
+        
+        // Initialize all event listeners
+        initializeEventListeners();
+        initializeSearchListeners();
+        
+        // Check for new day and reset if needed
+        checkAndResetIfNewDay();
+        
+        // Check for new day every 5 minutes
+        setInterval(checkAndResetIfNewDay, 5 * 60 * 1000);
+        
+        // Start fasting timer
+        updateFastingTimer();
+        setInterval(updateFastingTimer, 60000); // Update every minute
+        
+        // Register Service Worker for PWA (only on actual hosted domains, not in Claude artifacts)
+        if ('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent.com')) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('✅ ServiceWorker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('❌ ServiceWorker registration failed:', error);
+                    });
+            });
+        } else if (location.hostname.includes('claudeusercontent.com')) {
+            console.log('ℹ️ Service Worker disabled in preview mode. Will work when hosted on your own domain.');
+        }
+        
+        console.log('✅ NutriSnap initialized successfully!');
+        
+        }); // End DOMContentLoaded
+    </script>
+</body>
+</html>
