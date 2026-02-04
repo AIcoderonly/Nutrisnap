@@ -411,20 +411,53 @@
             letter-spacing: 0.05em;
         }
         
-        .delete-btn {
-            background: none;
-            border: none;
-            color: var(--accent-orange);
-            font-size: 1.2rem;
+        .edit-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--accent-blue);
+            font-size: 1.1rem;
             cursor: pointer;
-            padding: 8px;
-            margin-left: 12px;
-            opacity: 0.6;
-            transition: opacity 0.3s ease;
+            padding: 10px 14px;
+            border-radius: 8px;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .edit-btn:hover {
+            opacity: 1;
+            background: var(--accent-blue);
+            color: var(--bg-primary);
+            transform: scale(1.05);
+        }
+        
+        .delete-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--accent-orange);
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 10px 14px;
+            border-radius: 8px;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
         }
         
         .delete-btn:hover {
             opacity: 1;
+            background: var(--accent-orange);
+            color: var(--bg-primary);
+            transform: scale(1.05);
         }
         
         .empty-state {
@@ -701,12 +734,6 @@
             </div>
         </div>
         
-        <!-- Fasting Window Status -->
-        <div id="fastingStatus" style="background: var(--bg-secondary); padding: 14px 20px; border-radius: 12px; margin: 0 24px 20px 24px; text-align: center; display: none; border: 1px solid var(--border);">
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.5px;">FASTING WINDOW</div>
-            <div id="fastingTimeLeft" style="font-size: 1.15rem; font-weight: 700;"></div>
-        </div>
-        
         <div class="action-tabs">
             <div class="tabs-grid">
                 <button class="tab-btn grid-btn active" data-tab="search">
@@ -824,10 +851,12 @@
                 <div style="display: flex; gap: 8px; margin-bottom: 16px; margin-top: 24px; flex-wrap: wrap;">
                     <button class="data-btn" id="exportBtn">📥 Export JSON</button>
                     <button class="data-btn" id="exportExcelBtn" style="background: linear-gradient(135deg, #1d6f42, #38b76a); color: white; border: none;">📊 Export Excel</button>
-                    <button class="data-btn" id="importBtn">📤 Import</button>
+                    <button class="data-btn" id="importBtn">📤 Import JSON</button>
+                    <button class="data-btn" id="importExcelBtn" style="background: linear-gradient(135deg, #1d6f42, #38b76a); color: white; border: none;">📊 Import Excel</button>
                     <button class="data-btn danger" id="clearBtn">🗑️ Clear</button>
                 </div>
                 <input type="file" id="importFile" accept=".json" style="display: none;">
+                <input type="file" id="importExcelFile" accept=".xlsx,.xls" style="display: none;">
                 <div id="historyContent">
                     <div class="empty-state">
                         <div class="empty-icon">📊</div>
@@ -900,21 +929,6 @@
                             <option value="maintain" selected>Maintain Weight</option>
                             <option value="bulk">Build Muscle (Bulk)</option>
                         </select>
-                    </div>
-                    
-                    <div class="form-group" style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                        <label style="color: var(--accent-orange); margin-bottom: 8px; display: block;">🕐 Intermittent Fasting Window (Optional)</label>
-                        <small style="color: var(--text-muted); font-size: 0.85rem; display: block; margin-bottom: 12px;">Set your daily eating window for IF tracking</small>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                            <div>
-                                <label style="font-size: 0.85rem; margin-bottom: 4px; display: block;">Start Time</label>
-                                <input type="time" id="fastingStart" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
-                            </div>
-                            <div>
-                                <label style="font-size: 0.85rem; margin-bottom: 4px; display: block;">End Time</label>
-                                <input type="time" id="fastingEnd" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
-                            </div>
-                        </div>
                     </div>
                     
                     <button class="add-btn" id="calculateBtn">Calculate My Goals</button>
@@ -2127,54 +2141,6 @@
             localStorage.setItem(LAST_CHECK_DATE_KEY, today);
         }
         
-        // Fasting timer
-        function updateFastingTimer() {
-            const statusDiv = document.getElementById('fastingStatus');
-            const timerDiv = document.getElementById('fastingTimeLeft');
-            
-            if (!userProfile || !userProfile.fastingStart || !userProfile.fastingEnd) {
-                if (statusDiv) statusDiv.style.display = 'none';
-                return;
-            }
-            
-            try {
-                const now = new Date();
-                const currentTime = now.getHours() * 60 + now.getMinutes();
-                
-                const [startH, startM] = userProfile.fastingStart.split(':').map(Number);
-                const [endH, endM] = userProfile.fastingEnd.split(':').map(Number);
-                const startMinutes = startH * 60 + startM;
-                const endMinutes = endH * 60 + endM;
-                
-                const isInWindow = (currentTime >= startMinutes && currentTime < endMinutes);
-                
-                if (statusDiv) statusDiv.style.display = 'block';
-                
-                if (isInWindow) {
-                    const minutesLeft = endMinutes - currentTime;
-                    const hours = Math.floor(minutesLeft / 60);
-                    const mins = minutesLeft % 60;
-                    if (timerDiv) {
-                        timerDiv.textContent = `✅ Eating window: ${hours}h ${mins}m remaining`;
-                        timerDiv.style.color = 'var(--accent-green)';
-                    }
-                } else {
-                    const minutesUntilStart = startMinutes > currentTime ? 
-                        (startMinutes - currentTime) : 
-                        (1440 - currentTime + startMinutes);
-                    const hours = Math.floor(minutesUntilStart / 60);
-                    const mins = minutesUntilStart % 60;
-                    if (timerDiv) {
-                        timerDiv.textContent = `🚫 Fasting: ${hours}h ${mins}m until eating window`;
-                        timerDiv.style.color = 'var(--accent-orange)';
-                    }
-                }
-            } catch (error) {
-                console.log('Fasting timer error:', error);
-                if (statusDiv) statusDiv.style.display = 'none';
-            }
-        }
-        
         // Load data from storage on startup
         async function loadFromStorage() {
             try {
@@ -2231,12 +2197,6 @@
                 document.getElementById('bodyFat').value = userProfile.bodyFat || '';
                 document.getElementById('activityLevel').value = userProfile.activityLevel || '1.55';
                 document.getElementById('goal').value = userProfile.goal || 'maintain';
-                
-                // Load fasting window
-                const fastingStartEl = document.getElementById('fastingStart');
-                const fastingEndEl = document.getElementById('fastingEnd');
-                if (fastingStartEl) fastingStartEl.value = userProfile.fastingStart || '';
-                if (fastingEndEl) fastingEndEl.value = userProfile.fastingEnd || '';
             }
         }
         
@@ -2573,6 +2533,8 @@
                 return;
             }
             
+            const now = new Date();
+            
             // Sanitize text inputs
             const logEntry = {
                 name: sanitizeText(food.name),
@@ -2580,7 +2542,9 @@
                 calories: Math.round(food.calories),
                 protein: parseFloat(food.protein.toFixed(1)),
                 carbs: parseFloat(food.carbs.toFixed(1)),
-                timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                timestamp: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                date: now.toISOString().split('T')[0], // Store YYYY-MM-DD
+                time: now.toTimeString().split(' ')[0].substring(0, 5) // Store HH:MM
             };
             
             dailyLog.push(logEntry);
@@ -2613,28 +2577,213 @@
                 `;
             } else {
                 foodListDiv.innerHTML = dailyLog.map((item, index) => `
-                    <div class="food-item">
+                    <div class="food-item" data-index="${index}">
                         <div class="food-info">
                             <h3>${item.name}</h3>
-                            <div class="food-meta">${item.serving} · ${item.timestamp}</div>
+                            <div class="food-meta">${item.serving} · ${item.timestamp || item.time || ''}</div>
+                            <div class="food-macros" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                                ${item.protein}g protein · ${item.carbs}g carbs
+                            </div>
                         </div>
                         <div class="food-calories">
                             <div class="cal-value">${item.calories}</div>
                             <div class="cal-label">kcal</div>
                         </div>
-                        <button class="delete-btn" onclick="removeFood(${index})">×</button>
+                        <div class="food-actions" style="display: flex; gap: 12px; align-items: center;">
+                            <button class="edit-btn" data-index="${index}" title="Edit">✏️</button>
+                            <button class="delete-btn" data-index="${index}" title="Delete">×</button>
+                        </div>
                     </div>
                 `).join('');
             }
         }
         
+        // Event delegation for edit and delete buttons
+        function initializeFoodListListeners() {
+            const foodListDiv = document.getElementById('foodList');
+            if (!foodListDiv) {
+                console.error('❌ foodList element not found');
+                return;
+            }
+            
+            foodListDiv.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-btn');
+                const deleteBtn = e.target.closest('.delete-btn');
+                
+                if (editBtn) {
+                    const index = parseInt(editBtn.dataset.index);
+                    console.log('Edit clicked, index:', index);
+                    if (!isNaN(index)) editFood(index);
+                } else if (deleteBtn) {
+                    const index = parseInt(deleteBtn.dataset.index);
+                    console.log('Delete clicked, index:', index);
+                    if (!isNaN(index)) removeFood(index);
+                }
+            });
+            
+            console.log('✅ Food list event listeners initialized');
+        }
+        
         function removeFood(index) {
+            console.log('removeFood called with index:', index);
+            console.log('dailyLog length:', dailyLog.length);
+            console.log('dailyLog:', dailyLog);
+            
+            if (index < 0 || index >= dailyLog.length) {
+                console.error('Invalid index:', index);
+                return;
+            }
+            
             const food = dailyLog[index];
+            console.log('Attempting to delete:', food);
+            
             if (confirm(`Delete "${food.name}" (${food.calories} kcal)?`)) {
+                console.log('User confirmed deletion');
                 dailyLog.splice(index, 1);
+                console.log('After deletion, dailyLog length:', dailyLog.length);
                 updateDisplay();
                 saveToStorage();
+                console.log('✅ Deletion complete');
+            } else {
+                console.log('User cancelled deletion');
             }
+        }
+        
+        function editFood(index) {
+            if (index < 0 || index >= dailyLog.length) return;
+            
+            const food = dailyLog[index];
+            
+            // Create edit modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                padding: 20px;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 24px;
+                max-width: 500px;
+                width: 100%;
+                max-height: 90vh;
+                overflow-y: auto;
+            `;
+            
+            modalContent.innerHTML = `
+                <h3 style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 16px;">
+                    Edit Food Entry
+                </h3>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Food Name</label>
+                    <input type="text" id="editName" value="${food.name}" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                </div>
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Serving Size</label>
+                    <input type="text" id="editServing" value="${food.serving}" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Date</label>
+                        <input type="date" id="editDate" value="${food.date || new Date().toISOString().split('T')[0]}" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Time</label>
+                        <input type="time" id="editTime" value="${food.time || '12:00'}" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Calories</label>
+                        <input type="number" id="editCalories" value="${food.calories}" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Protein (g)</label>
+                        <input type="number" id="editProtein" value="${food.protein}" step="0.1" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 8px;">Carbs (g)</label>
+                        <input type="number" id="editCarbs" value="${food.carbs}" step="0.1" style="width: 100%; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-family: 'Manrope', sans-serif;">
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px;">
+                    <button id="saveEditBtn" style="flex: 1; padding: 14px; background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); border: none; border-radius: 8px; color: var(--bg-primary); font-size: 1rem; font-weight: 700; cursor: pointer;">
+                        Save Changes
+                    </button>
+                    <button id="cancelEditBtn" style="flex: 1; padding: 14px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 1rem; font-weight: 700; cursor: pointer;">
+                        Cancel
+                    </button>
+                </div>
+            `;
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Save button
+            modalContent.querySelector('#saveEditBtn').addEventListener('click', () => {
+                const name = modalContent.querySelector('#editName').value.trim();
+                const serving = modalContent.querySelector('#editServing').value.trim();
+                const date = modalContent.querySelector('#editDate').value;
+                const time = modalContent.querySelector('#editTime').value;
+                const calories = parseInt(modalContent.querySelector('#editCalories').value);
+                const protein = parseFloat(modalContent.querySelector('#editProtein').value);
+                const carbs = parseFloat(modalContent.querySelector('#editCarbs').value);
+                
+                if (!name || !serving || !date || !time || isNaN(calories) || isNaN(protein) || isNaN(carbs)) {
+                    alert('❌ Please fill in all fields with valid values');
+                    return;
+                }
+                
+                // Create timestamp from time for display
+                const [hours, minutes] = time.split(':');
+                const displayTime = new Date(2000, 0, 1, parseInt(hours), parseInt(minutes)).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                // Update the food entry
+                dailyLog[index] = {
+                    name: sanitizeText(name),
+                    serving: sanitizeText(serving),
+                    calories: Math.round(calories),
+                    protein: parseFloat(protein.toFixed(1)),
+                    carbs: parseFloat(carbs.toFixed(1)),
+                    date: date,
+                    time: time,
+                    timestamp: displayTime
+                };
+                
+                updateDisplay();
+                saveToStorage();
+                document.body.removeChild(modal);
+                alert('✅ Food entry updated!');
+            });
+            
+            // Cancel button
+            modalContent.querySelector('#cancelEditBtn').addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
         }
         
         function updateHistoryDisplay() {
@@ -2899,9 +3048,7 @@
                     weight,
                     bodyFat,
                     activityLevel,
-                    goal,
-                    fastingStart: document.getElementById('fastingStart').value || null,
-                    fastingEnd: document.getElementById('fastingEnd').value || null
+                    goal
                 };
                 
                 try {
@@ -3223,6 +3370,104 @@
         });
         }
         
+        // Excel import functionality
+        const importExcelBtn = document.getElementById('importExcelBtn');
+        const importExcelFile = document.getElementById('importExcelFile');
+        
+        if (importExcelBtn && importExcelFile) {
+            importExcelBtn.addEventListener('click', () => {
+                importExcelFile.click();
+            });
+            
+            importExcelFile.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                // Validate file type
+                if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+                    alert('❌ Please upload an Excel file (.xlsx or .xls)');
+                    e.target.value = '';
+                    return;
+                }
+                
+                try {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        try {
+                            const data = new Uint8Array(event.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            
+                            // Read Today's Meals sheet
+                            if (workbook.SheetNames.includes("Today's Meals")) {
+                                const sheet = workbook.Sheets["Today's Meals"];
+                                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                                
+                                if (jsonData.length > 0) {
+                                    // Clear current log and import new entries
+                                    dailyLog = [];
+                                    
+                                    jsonData.forEach(row => {
+                                        if (row.Food && row.Calories) {
+                                            const entry = {
+                                                name: row.Food || 'Unknown',
+                                                serving: row.Serving || 'N/A',
+                                                calories: parseInt(row.Calories) || 0,
+                                                protein: parseFloat(row['Protein (g)']) || 0,
+                                                carbs: parseFloat(row['Carbs (g)']) || 0,
+                                                timestamp: row.Time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                                                date: getTodayDate(),
+                                                time: row.Time || '12:00'
+                                            };
+                                            
+                                            dailyLog.push(entry);
+                                        }
+                                    });
+                                    
+                                    saveToStorage();
+                                    updateDisplay();
+                                }
+                            }
+                            
+                            // Read History sheet if exists
+                            if (workbook.SheetNames.includes("History")) {
+                                const historySheet = workbook.Sheets["History"];
+                                const historyData = XLSX.utils.sheet_to_json(historySheet);
+                                
+                                if (historyData.length > 0) {
+                                    nutritionHistory = historyData.map(row => ({
+                                        date: row.Date || getTodayDate(),
+                                        calories: parseInt(row.Calories) || 0,
+                                        protein: parseInt(row['Protein (g)']) || 0,
+                                        carbs: parseInt(row['Carbs (g)']) || 0,
+                                        mealCount: parseInt(row.Meals) || 0
+                                    }));
+                                    
+                                    localStorage.setItem(HISTORY_KEY, JSON.stringify(nutritionHistory));
+                                    updateHistoryDisplay();
+                                    updateChart();
+                                }
+                            }
+                            
+                            alert('✅ Excel data imported successfully!');
+                            e.target.value = '';
+                            
+                        } catch (parseError) {
+                            console.error('Excel parse error:', parseError);
+                            alert('❌ Error reading Excel file. Please ensure it has the correct format.');
+                            e.target.value = '';
+                        }
+                    };
+                    
+                    reader.readAsArrayBuffer(file);
+                    
+                } catch (error) {
+                    console.error('Excel import error:', error);
+                    alert('❌ Error importing Excel file. Please try again.');
+                    e.target.value = '';
+                }
+            });
+        }
+        
         // Clear all data functionality
         const clearBtn = document.getElementById('clearBtn');
         if (clearBtn) {
@@ -3281,16 +3526,11 @@
         // Initialize all event listeners
         initializeEventListeners();
         initializeSearchListeners();
+        initializeFoodListListeners();
         
-        // Check for new day and reset if needed
+        // Check for new day and reset if needed (runs on load and every minute)
         checkAndResetIfNewDay();
-        
-        // Check for new day every 5 minutes
-        setInterval(checkAndResetIfNewDay, 5 * 60 * 1000);
-        
-        // Start fasting timer
-        updateFastingTimer();
-        setInterval(updateFastingTimer, 60000); // Update every minute
+        setInterval(checkAndResetIfNewDay, 60 * 1000); // Check every minute
         
         // Register Service Worker for PWA (only on actual hosted domains, not in Claude artifacts)
         if ('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent.com')) {
