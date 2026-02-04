@@ -472,6 +472,18 @@
             opacity: 0.3;
         }
         
+        .food-macros {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        .food-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
         .suggestions {
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
@@ -1006,7 +1018,6 @@
     <script>
         // Wait for DOM to be fully loaded before initializing
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 NutriSnap initializing...');
             
         // Storage key for daily logs
         const STORAGE_KEY = 'daily-nutrition-log';
@@ -2113,6 +2124,19 @@
             return now.toISOString().split('T')[0];
         }
         
+        // Debounce utility for performance optimization
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
         // Check if date has changed and reset if needed
         function checkAndResetIfNewDay() {
             const today = getTodayDate();
@@ -2320,14 +2344,10 @@
             const searchInput = document.getElementById('foodSearch');
             const suggestionsDiv = document.getElementById('suggestions');
             
-            if (!searchInput || !suggestionsDiv) {
-                console.log('Search elements not found');
-                return;
-            }
+            if (!searchInput || !suggestionsDiv) return;
             
-            searchInput.addEventListener('input', (e) => {
-                const query = e.target.value.toLowerCase().trim();
-                
+            // Debounced search function for better performance
+            const performSearch = debounce((query) => {
                 if (query.length < 2) {
                     suggestionsDiv.style.display = 'none';
                     return;
@@ -2348,6 +2368,10 @@
                 } else {
                     suggestionsDiv.style.display = 'none';
                 }
+            }, 200);
+            
+            searchInput.addEventListener('input', (e) => {
+                performSearch(e.target.value.toLowerCase().trim());
             });
             
             suggestionsDiv.addEventListener('click', (e) => {
@@ -2581,7 +2605,7 @@
                         <div class="food-info">
                             <h3>${item.name}</h3>
                             <div class="food-meta">${item.serving} · ${item.timestamp || item.time || ''}</div>
-                            <div class="food-macros" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                            <div class="food-macros">
                                 ${item.protein}g protein · ${item.carbs}g carbs
                             </div>
                         </div>
@@ -2589,7 +2613,7 @@
                             <div class="cal-value">${item.calories}</div>
                             <div class="cal-label">kcal</div>
                         </div>
-                        <div class="food-actions" style="display: flex; gap: 12px; align-items: center;">
+                        <div class="food-actions">
                             <button class="edit-btn" data-index="${index}" title="Edit">✏️</button>
                             <button class="delete-btn" data-index="${index}" title="Delete">×</button>
                         </div>
@@ -2601,10 +2625,7 @@
         // Event delegation for edit and delete buttons
         function initializeFoodListListeners() {
             const foodListDiv = document.getElementById('foodList');
-            if (!foodListDiv) {
-                console.error('❌ foodList element not found');
-                return;
-            }
+            if (!foodListDiv) return;
             
             foodListDiv.addEventListener('click', (e) => {
                 const editBtn = e.target.closest('.edit-btn');
@@ -2612,40 +2633,22 @@
                 
                 if (editBtn) {
                     const index = parseInt(editBtn.dataset.index);
-                    console.log('Edit clicked, index:', index);
                     if (!isNaN(index)) editFood(index);
                 } else if (deleteBtn) {
                     const index = parseInt(deleteBtn.dataset.index);
-                    console.log('Delete clicked, index:', index);
                     if (!isNaN(index)) removeFood(index);
                 }
             });
-            
-            console.log('✅ Food list event listeners initialized');
         }
         
         function removeFood(index) {
-            console.log('removeFood called with index:', index);
-            console.log('dailyLog length:', dailyLog.length);
-            console.log('dailyLog:', dailyLog);
-            
-            if (index < 0 || index >= dailyLog.length) {
-                console.error('Invalid index:', index);
-                return;
-            }
+            if (index < 0 || index >= dailyLog.length) return;
             
             const food = dailyLog[index];
-            console.log('Attempting to delete:', food);
-            
             if (confirm(`Delete "${food.name}" (${food.calories} kcal)?`)) {
-                console.log('User confirmed deletion');
                 dailyLog.splice(index, 1);
-                console.log('After deletion, dailyLog length:', dailyLog.length);
                 updateDisplay();
                 saveToStorage();
-                console.log('✅ Deletion complete');
-            } else {
-                console.log('User cancelled deletion');
             }
         }
         
@@ -2977,16 +2980,18 @@
             }
         }
         
-        // Add event listeners for real-time calculation
+        // Add event listeners for real-time calculation (debounced)
         const manualCaloriesPer100 = document.getElementById('manualCaloriesPer100');
         const manualProteinPer100 = document.getElementById('manualProteinPer100');
         const manualCarbsPer100 = document.getElementById('manualCarbsPer100');
         const manualServingGrams = document.getElementById('manualServingGrams');
         
-        if (manualCaloriesPer100) manualCaloriesPer100.addEventListener('input', updateManualPreview);
-        if (manualProteinPer100) manualProteinPer100.addEventListener('input', updateManualPreview);
-        if (manualCarbsPer100) manualCarbsPer100.addEventListener('input', updateManualPreview);
-        if (manualServingGrams) manualServingGrams.addEventListener('input', updateManualPreview);
+        const debouncedPreview = debounce(updateManualPreview, 150);
+        
+        if (manualCaloriesPer100) manualCaloriesPer100.addEventListener('input', debouncedPreview);
+        if (manualProteinPer100) manualProteinPer100.addEventListener('input', debouncedPreview);
+        if (manualCarbsPer100) manualCarbsPer100.addEventListener('input', debouncedPreview);
+        if (manualServingGrams) manualServingGrams.addEventListener('input', debouncedPreview);
         
         // Calculate button handler
         const calculateBtn = document.getElementById('calculateBtn');
@@ -3544,10 +3549,8 @@
                     });
             });
         } else if (location.hostname.includes('claudeusercontent.com')) {
-            console.log('ℹ️ Service Worker disabled in preview mode. Will work when hosted on your own domain.');
+            console.log('ℹ️ Service Worker disabled in preview mode.');
         }
-        
-        console.log('✅ NutriSnap initialized successfully!');
         
         }); // End DOMContentLoaded
     </script>
